@@ -45,8 +45,13 @@ func (v* Vehicle) move() {
 
 	// 1m = 1 / 40075000.0 / cos(lat) * 3600
 
-	v.lat += latDiffMeters / 111320.0
-	v.lon += lonDiffMeters * 3600.0 / 40075000.0 / math.Cos(v.lat) 
+	latDiff := latDiffMeters / 111320.0
+	lonDiff := lonDiffMeters * 3600.0 / 40075000.0 / math.Cos(v.lat) 
+
+	v.lat += latDiff;
+	v.lon += lonDiff;
+
+	fmt.Printf("latDiffMeters = %f, latDiff = %f\n", latDiffMeters, latDiff)
 
 	if v.lat > maxLat || v.lat < minLat {
 		v.dirX *= -1
@@ -73,7 +78,7 @@ func (v* Vehicle) reportLocation() {
 		current_time.UnixNano() / 1000000,
 	}
 
-	error := logger.Post("car", data)
+	error := logger.Post("car.xd", data)
 	if error != nil {
 	  panic(error)
 	}
@@ -85,7 +90,7 @@ func RandomVehicle(carId int) *Vehicle {
 		carId: carId,
 		lat: rand.Float64() * (maxLat - minLat) + minLat,
 		lon: rand.Float64() * (maxLon - minLon) + minLon,
-		speedMPerS: rand.Float64() * 20,
+		speedMPerS: rand.Float64() * 1,
 		acc: 0.0,
 		dirX: dir_coordinate,
 		dirY: 10.0 - dir_coordinate,
@@ -114,7 +119,7 @@ func main() {
 
 	
 
-	for step := 1; step < steps_no; step += 1 {
+	for step := 1; step <= steps_no; step += 1 {
 		for i:=0; i<vehicles_no; i += 1 {
 			vehicles[i].move()
 			vehicles[i].reportLocation()

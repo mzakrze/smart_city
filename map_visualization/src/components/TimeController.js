@@ -9,7 +9,6 @@ class TimeController extends React.Component {
             min: null,
             max: null,
             simulation_progress: 0,
-
             initialized: false
         };
     }
@@ -40,7 +39,7 @@ class TimeController extends React.Component {
 
     renderPlayButton() {
         let handle = () => {
-            this.props.notifyStartSimulation(this.state.min);
+            this.props.notifyStartSimulation(this.state.min, this.state.max);
         }
         if (this.state.initialized) {
             return <button type="button" onClick={handle}>Play</button>
