@@ -17,7 +17,7 @@ const (
 	steps_no = 1000
 	step_interval_ms = 100
 
-	vehicles_no = 1
+	vehicles_no = 2
 )
 
 type Vehicle struct {
@@ -50,8 +50,6 @@ func (v* Vehicle) move() {
 
 	v.lat += latDiff;
 	v.lon += lonDiff;
-
-	fmt.Printf("latDiffMeters = %f, latDiff = %f\n", latDiffMeters, latDiff)
 
 	if v.lat > maxLat || v.lat < minLat {
 		v.dirX *= -1

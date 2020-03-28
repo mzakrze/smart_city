@@ -108,41 +108,45 @@ class ElasticsearchFacade {
                 }
 
                 // TODO - może nie działać dla półkuli innej niż NE
-                let locationArray = [];
                 let bbox_north = null; 
                 let bbox_south = null; 
                 let bbox_east = null; 
                 let bbox_west = null; 
+
+                let result = {};
+
                 for(let hit of res.hits.hits) {
                     let s = hit._source;
-                    locationArray.push(s.location);
-                    bbox_north = bbox_north == null || s.location.lon > bbox_north ? s.location.lon : bbox_north;
-                    bbox_south = bbox_south == null || s.location.lon < bbox_south ? s.location.lon : bbox_south;
-                    bbox_east = bbox_east == null || s.location.lon > bbox_east ? s.location.lat : bbox_east;
-                    bbox_west = bbox_west == null || s.location.lon > bbox_west ? s.location.lat : bbox_west;
+
+                    if (result[s.car_id] == undefined) {
+                        result[s.car_id] = {
+                            car_id: s.car_id, 
+                            startSecond: Math.floor(ts / 1000), // conversion: miliseconds -> seconds,
+                            location: [s.location],
+                        }
+                    } else {
+                        result[s.car_id].location.push(s.location);
+                    }
                 }
 
-                let document = {
-                    car_id: res.hits.hits[0]._source.car_id, // FIXME - dostosować do więcej niż 1 pojazdu
-                    startSecond: Math.floor(ts / 1000), // conversion: miliseconds -> seconds,
-                    location: locationArray,
-                    bbox_north,
-                    bbox_south,
-                    bbox_east,
-                    bbox_west,
-                };
+                for(const [car_id, document] of Object.entries(result)) {
+                    document.bbox_north = Math.max(...document.location.map(e => e.lat));
+                    document.bbox_south = Math.min(...document.location.map(e => e.lat));
+                    document.bbox_east = Math.max(...document.location.map(e => e.lon));
+                    document.bbox_west = Math.min(...document.location.map(e => e.lon));
 
-                fetch("/" + this.searchIndex + "/_doc", {
-                    method: "POST",
-                    body: JSON.stringify(document),
-                    headers: {
-                        'Accept': 'application/json',
-                        'Content-Type': 'application/json'
-                    }})
-                .then(res => res.json())
-                .then(res => {
-                    console.log(res);
-                });
+                    fetch("/" + this.searchIndex + "/_doc", {
+                        method: "POST",
+                        body: JSON.stringify(document),
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        }})
+                    .then(res => res.json())
+                    .then(res => {
+                        console.log(res);
+                    });
+                }  
             })
 
             fetchAllPromises.push(fetchAllPromises);
@@ -153,10 +157,10 @@ class ElasticsearchFacade {
 
     getResultsForSecondAndBBox(epochSecond, boundBox) {
         // TODO - przetestować dla innej półkuli niż NE
-        // const topLeftLat = boundBox.bbox_north;
-        // const topLeftLon = boundBox.bbox_west;
-        // const bottomRightLat = boundBox.bbox_south;
-        // const bottomRightLon = boundBox.bbox_east;
+        const topLeftLat = boundBox.north;
+        const topLeftLon = boundBox.west;
+        const bottomRightLat = boundBox.south;
+        const bottomRightLon = boundBox.east;
 
         /*
         Zakładam, że samochód o danym id pojawia się na początku danej sekundy (czyli w timestamp = "*000"), i nie pojawia się "w połowie" sekundu
@@ -169,37 +173,34 @@ class ElasticsearchFacade {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                "query": {
-                    term : {
-                        startSecond: epochSecond
-                    },
-                    // FIXME - bounding box
-                        // "filter" : {
-                        //     "range" : {
-                        //         "TODO" : {
-                        //             "top_left" : {
-                        //                 "lat" : topLeftLat,
-                        //                 "lon" : topLeftLon
-                        //             },
-                        //             "bottom_right" : {
-                        //                 "lat" : bottomRightLat,
-                        //                 "lon" : bottomRightLon
-                        //             }
-                        //         }
-                        //     }
-                        // },
-
-
-
-
-
-
-
+                query: {
+                    bool: {
+                        filter: [
+                            { term: { startSecond: epochSecond }},
+                            { range: { bbox_north : {gte: boundBox.south }}},
+                            { range: { bbox_south : {lte: boundBox.north }}},
+                            { range: { bbox_east : {gte: boundBox.west }}},
+                            { range: { bbox_west : {lte: boundBox.east }}},
+                        ]
+                    }
                 }})})
         .then(res => res.json())
         .then(res => {
-            // TODO - dodać obsługę wielu pojazdów
-            doResolve(res.hits.hits[0]._source)
+            let hits = res.hits.hits;
+            let result = {};
+            for(let r of hits) {
+                result[r._source.car_id] = r._source.location;
+            } 
+            doResolve(result)
+            
+            /*
+            result = {
+                0: [{lat, lon}, ...],
+                1: [{lat, lon}, ...],
+                ...,
+                <car_id>: <location array>
+            }
+            */
         })
        })
         

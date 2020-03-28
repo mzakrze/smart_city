@@ -16,7 +16,8 @@ class LeafletMap extends React.Component{
         this.simulationStopSecond = null;
         this.simulationPingPongState = null;
         this.timeSpentWaiting_ms = null;
-        this.cacheRefilling = false;
+        this.cacheRefillingPing = false;
+        this.cacheRefillingPong = false;
         this.simulationTimeOffset_ms = null;
         // TODO - moze bedzie trezba parametryzować pingPongDuration
 
@@ -26,15 +27,18 @@ class LeafletMap extends React.Component{
 
         this.runningSimulationRev = null;
         this.startSimulationRev = null;
+
+        this.map = null;
+        this.simulationVisualizationLayer = null;
     }
 
     componentDidMount() {
-        var map = L.map('leaflet-map-id').setView([52.218994864793, 21.011712029573467], 14);
+        this.map = L.map('leaflet-map-id').setView([52.218994864793, 21.011712029573467], 14);
 
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 18,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
+        }).addTo(this.map);
 
         var that = this;
 
@@ -55,6 +59,8 @@ class LeafletMap extends React.Component{
             },
 
             render: function() {
+                const redrawThrottle_ms = 50; 
+
                 var canvas = this.getCanvas();
                 var ctx = canvas.getContext('2d');
 
@@ -65,6 +71,9 @@ class LeafletMap extends React.Component{
                     // debug drawing
                     var point = this._map.latLngToContainerPoint(new L.LatLng(52.218994864793, 21.011712029573467));
                     this.renderCircle(ctx, point, (1.0 + Math.sin(Date.now()*0.001))*100);
+
+
+                    
                 }
 
                 if (that.runningSimulationRev != that.startSimulationRev) {
@@ -73,14 +82,19 @@ class LeafletMap extends React.Component{
                     that.startSimulationTS = new Date().getTime(); 
                 }
 
-
                 if (that.runningSimulationRev != null) {
-                    
-                    that.cacheNextPingPongIfNecessary()
+                 
+                    that.cacheNextPingPongIfNecessary() // TODO - to tak naprawde powinno byc inicjowane od razu przy przechodzeniu z ping na pong i odwrotnie, nie sprawdzane
 
-                    let ms = new Date().getTime();
+                    var ms = new Date().getTime();
 
-                    let step = ms - that.simulationTimeOffset_ms - that.simulationCurrentSecond * 1000
+                    if (that.throttlingRedrawTs != null) {
+                        // resuming after cache miss
+                        that.timeSpentWaiting_ms += ms - that.throttlingRedrawTs;
+                        that.throttlingRedrawTs = null;
+                    }
+
+                    let step = ms - that.timeSpentWaiting_ms - that.simulationTimeOffset_ms - that.simulationCurrentSecond * 1000;
                     if (step >= 1000) {
                         switch (that.simulationPingPongState) {
                         case "ping":
@@ -96,7 +110,6 @@ class LeafletMap extends React.Component{
                         }
 
                         that.simulationCurrentSecond += 1;
-                        console.log(that.simulationPingPongState);
                         step -= 1000;
                     }
                     
@@ -110,46 +123,73 @@ class LeafletMap extends React.Component{
 
                     let res = that.simulationPingPongState == "ping" ? that.simulationResultCachedPing : that.simulationResultCachedPong;
 
+                    if (res == null) {
+                        // renderowanie symbolu oczekiwania
+                        // TODO - tymczasowy bieda-symbol: 
+                        ctx.fillStyle = 'rgba(60, 60, 60, 0.5)';
+                        ctx.fillRect(100, 100, 200, 200);
+
+                        that.throttlingRedrawTs = new Date().getTime();;
+
+                        // tutaj celowo nie jest wołany redraw, zostanie on zawołany jak będzie zwrotka z ES
+                        return;
+                    } 
+                    
                     let index = Math.floor(step / Settings.SamplingPeriod_ms);
 
-                    let p = res.location[index];
-                    // TODO - new L.LatLng można robić przed włożeniem do cache
-                    let point = this._map.latLngToContainerPoint(new L.LatLng(p.lat, p.lon));
+                    for(const [car_id, locationArray] of Object.entries(res)) {
+                        let p = locationArray[index];
+                        // TODO - new L.LatLng można robić przed włożeniem do cache
+                        let point = this._map.latLngToContainerPoint(new L.LatLng(p.lat, p.lon));
 
-                    this.renderVehicle(ctx, point);
+                        this.renderVehicle(ctx, point);
+                    }
+
                 }
 
                 this.redraw();
             }
         });
 
-        new SimulationVisualizationLayer()
-            .addTo(map);
+        this.simulationVisualizationLayer = new SimulationVisualizationLayer();
+        this.simulationVisualizationLayer
+            .addTo(this.map);
 
         this.elasticsearchFacade.initSearchIndexExtractTransormLoad();
     }
 
     cacheNextPingPongIfNecessary() {
-        if(this.cacheRefilling) {
-            return;
+        let callback = null;
+
+        if (this.simulationPingPongState == "ping" && this.simulationResultCachedPong == null && this.cacheRefillingPong == false) {
+            this.cacheRefillingPong = true;
+
+            callback = (value) => {
+                this.simulationResultCachedPong = value;
+                this.cacheRefillingPong = false;
+
+                if (this.throttlingRedrawTs) {
+                    this.simulationVisualizationLayer.redraw();
+                }
+            }
+        }
+        if (this.simulationPingPongState == "pong" && this.simulationResultCachedPing == null && this.cacheRefillingPing == false) {
+            this.cacheRefillingPing = true;
+
+            callback = (value) => {
+                this.simulationResultCachedPing = value;
+                this.cacheRefillingPing = false;
+        
+                if (this.throttlingRedrawTs) {
+                    this.simulationVisualizationLayer.redraw();
+                }
+            }
         }
 
-        let setValueCallback = null;
-        if (this.simulationPingPongState == "ping" && this.simulationResultCachedPong == null) {
-            setValueCallback = (value) => this.simulationResultCachedPong = value; 
-        }
-        if (this.simulationPingPongState == "pong" && this.simulationResultCachedPing == null) {
-            setValueCallback = (value) => this.simulationResultCachedPing = value;
-        }
-
-        // TODO - dodać bbox
         // TODO - w zależności od rozmiaru bbox przerzucać sie na inny (mniej / bardziej dokładny algorytm)
-        if (setValueCallback != null) {
-            this.elasticsearchFacade.getResultsForSecondAndBBox(this.simulationCurrentSecond + 1)
-                .then(value => {
-                    setValueCallback(value);
-                    this.cacheRefilling = false;
-                })
+        if (callback != null) {
+            this.elasticsearchFacade.getResultsForSecondAndBBox(this.simulationCurrentSecond + 1, this.getCurrentBoundingBox())
+                .then(callback);
         }
     }
 
@@ -161,7 +201,7 @@ class LeafletMap extends React.Component{
             this.simulationCurrentSecond = Math.floor(nextProps.timestamp / 1000);
             this.simulationStopSecond = Math.floor(nextProps.simulationStop_ms / 1000);
 
-            this.elasticsearchFacade.getResultsForSecondAndBBox(this.simulationCurrentSecond)
+            this.elasticsearchFacade.getResultsForSecondAndBBox(this.simulationCurrentSecond, this.getCurrentBoundingBox())
                 .then(value => {
                     this.simulationPingPongState = "ping";
                     this.simulationTimeOffset_ms = new Date().getTime() - nextProps.timestamp;
@@ -173,6 +213,15 @@ class LeafletMap extends React.Component{
         }
 
         // TODO - jeśli stop
+    }
+
+    getCurrentBoundingBox() {
+        return {
+            north: this.map.getBounds()._northEast.lat,
+            south: this.map.getBounds()._southWest.lat,
+            east: this.map.getBounds()._northEast.lng,
+            west: this.map.getBounds()._southWest.lng
+        };
     }
 
     render() {
