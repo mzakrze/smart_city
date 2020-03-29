@@ -55,14 +55,14 @@ class LeafletMap extends React.Component{
 
             renderVehicle: function(ctx, location) {
                 ctx.fillStyle = 'rgba(255, 0, 60, 1)';
-                ctx.fillRect(location.x, location.y, 10, 10);
+                ctx.fillRect(location.x, location.y, 5, 5);
             },
 
             render: function() {
                 const redrawThrottle_ms = 50; 
 
                 var canvas = this.getCanvas();
-                var ctx = canvas.getContext('2d');
+                var ctx = canvas.getContext('2d', { alpha: false });
 
                 // clear canvas
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -137,7 +137,7 @@ class LeafletMap extends React.Component{
                     
                     let index = Math.floor(step / Settings.SamplingPeriod_ms);
 
-                    for(const [car_id, locationArray] of Object.entries(res)) {
+                    for(const [vehicle_id, locationArray] of Object.entries(res)) {
                         let p = locationArray[index];
                         // TODO - new L.LatLng można robić przed włożeniem do cache
                         let point = this._map.latLngToContainerPoint(new L.LatLng(p.lat, p.lon));
@@ -147,6 +147,9 @@ class LeafletMap extends React.Component{
 
                 }
 
+                // TODO - w razie problemów wydajnosciowych - jesli sie da - w serviceworkerze pisac do canvasów i cacheować canvasy
+                // TODO - zapisywać co ile czasu faktycznie bylo rysowanie
+                // TODO - może lepiej zamiast renderowac co ktoras klatke - renderowac w spowolnionym tempie
                 this.redraw();
             }
         });

@@ -18,8 +18,8 @@ class ElasticsearchFacade {
     constructor() {
         const simulationNameMock = "";
         const INDEX_SEARCH_SUFFIX = "-search"
-        this.index = "simulation-1-log";
-        this.searchIndex = "simulation-1-map";
+        this.index = "simulation-log-1";
+        this.searchIndex = "simulation-map-1";
 
     }
 
@@ -79,7 +79,7 @@ class ElasticsearchFacade {
                 query: {
                     bool: {
                         filter: [
-                            { term: { startSecond: epochSecond }},
+                            { term: { start_second: epochSecond }},
                             { range: { bbox_north : {gte: boundBox.south }}},
                             { range: { bbox_south : {lte: boundBox.north }}},
                             { range: { bbox_east : {gte: boundBox.west }}},
@@ -92,19 +92,19 @@ class ElasticsearchFacade {
             let hits = res.hits.hits;
             let result = {};
             for(let r of hits) {
-                result[r._source.car_id] = r._source.location;
+                result[r._source.vehicle_id] = r._source.location_array;
             } 
             if (res.hits.total > sizeParam) {
                 console.error("Not every vehicle is showed!!! Total number of records exceeds " + sizeParam + " (max for Elasticsearch)")
             }
-            doResolve(result);
+            doResolve(result)
             
             /*
             result = {
                 0: [{lat, lon}, ...],
                 1: [{lat, lon}, ...],
                 ...,
-                <car_id>: <location array>
+                <vehicle_id>: <location array>
             }
             */
         })

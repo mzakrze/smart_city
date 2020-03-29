@@ -1,9 +1,15 @@
 #!/bin/bash
 
-curl -X DELETE localhost:9200/simulation-1
+curl -X DELETE localhost:9200/simulation-log-1
+echo ""
+curl -X DELETE localhost:9200/simulation-map-1
+echo ""
+curl -X DELETE localhost:9200/simulation-trip-1
+
+echo ""
 echo ""
 
-curl -X PUT localhost:9200/simulation-1 \
+curl -X PUT localhost:9200/simulation-log-1 \
     -H "Content-Type: application/json" \
     -d '{
         "settings" : {
@@ -15,7 +21,7 @@ curl -X PUT localhost:9200/simulation-1 \
         "mappings": {
             "dynamic": "strict",
             "properties": {
-                "car_id": {
+                "vehicle_id": {
                     "type": "integer"
                 },
                 "location": {
@@ -27,23 +33,17 @@ curl -X PUT localhost:9200/simulation-1 \
                 "@timestamp": {
                     "type": "date",
                     "format": "epoch_millis"
-                },
-                "my_epoch": {
-                    "type": "long"
                 }
             }
         }
     }'
+
+
+echo ""
 echo ""
 
-# test
-# curl -X POST localhost:9200/simulation/_doc \
-#     -H "Content-Type: application/json" \
-#     -d '{"car_id": 5, "location": {"lat": "52.2297700", "lon": "21.0117800"}, "speed": 3.14}'
 
-# curl -X POST localhost:9880/car.xd -d '{"car_no": 5, "location": {"lat": "52.2297700", "lon": "21.0117800"}, "speed": 3.14}'
-
-curl -X PUT localhost:9200/simulation-1-map \
+curl -X PUT localhost:9200/simulation-map-1 \
     -H "Content-Type: application/json" \
     -d '{
         "settings" : {
@@ -55,10 +55,13 @@ curl -X PUT localhost:9200/simulation-1-map \
         "mappings": {
             "dynamic": "strict",
             "properties": {
-                "car_id": {
+                "vehicle_id": {
                     "type": "integer"
                 },
-                "startSecond:" {
+                "location_array": {
+                    "type": "geo_point"
+                },
+                "start_second": {
                     "type": "date",
                     "format": "epoch_second"
                 },
@@ -74,19 +77,56 @@ curl -X PUT localhost:9200/simulation-1-map \
                 "bbox_west": {
                     "type": "float"
                 }
-                "location": {
-                    "type": "geo_point"
-                }
             }
         }
     }'
+
+
+echo ""
 echo ""
 
+curl -X PUT localhost:9200/simulation-trip-1 \
+    -H "Content-Type: application/json" \
+    -d '{
+        "settings" : {
+            "index" : {
+                "number_of_shards" : 1, 
+                "number_of_replicas" : 0 
+            }
+        },
+        "mappings": {
+            "dynamic": "strict",
+            "properties": {
+                "vehicle_id": {
+                    "type": "integer"
+                },
+                "start_ts": {
+                    "type": "date",
+                    "format": "epoch_millis"
+                },
+                "end_ts": {
+                    "type": "date",
+                    "format": "epoch_millis"
+                },
+                "origin_lat": {
+                    "type": "float"
+                },
+                "origin_lon": {
+                    "type": "float"
+                },
+                "destination_lat": {
+                    "type": "float"
+                },
+                "destination_lon": {
+                    "type": "float"
+                } 
+            }
+        }
+    }'
 
 
-
-
-
+echo ""
+echo ""
 
 
 
