@@ -14,7 +14,7 @@ class TimeController extends React.Component {
     }
 
     componentDidMount() {
-        fetch("/simulation/_search", {
+        fetch("/simulation-1-log/_search", {
             method: 'POST',
             body: JSON.stringify({
                 "aggs" : {

@@ -6,6 +6,7 @@ import (
 	"time"
 	"math/rand"
 	"math"
+	"encoding/json"
 )
 
 const (
@@ -14,10 +15,10 @@ const (
 	minLat = 52.212656
 	minLon = 20.937030
 
-	steps_no = 1000
-	step_interval_ms = 100
+	steps_no = 2000
+	step_interval_ms = 100 // TODO - wymusic podzielne przez 1000
 
-	vehicles_no = 2
+	vehicles_no = 500
 )
 
 type Vehicle struct {
@@ -28,6 +29,19 @@ type Vehicle struct {
 	acc float64
 	dirX float64 // TODO - rename dirLat, dirLon
 	dirY float64
+
+	locationReport *VehicleLocationReport
+}
+
+type VehicleLocationReport struct {
+	carId int
+	location []LocationStruct
+	startSecond int64
+} 
+
+type LocationStruct struct {
+	Lat float64
+	Lon float64
 }
 
 func (v* Vehicle) move() {
@@ -60,26 +74,92 @@ func (v* Vehicle) move() {
 }
 
 func (v* Vehicle) reportLocation() {
+	var ts int64 = current_time.UnixNano() / 1000000
 	data := struct {
 		Speed float64 //3.14 //v.speed
 		Lat float64
 		Lon float64
 		Car_no int 
 		Timestamp int64
-		MyEpoch int64
 	} {
 		v.speedMPerS,
 		v.lat,
 		v.lon,
 		v.carId,
-		current_time.UnixNano() / 1000000,
-		current_time.UnixNano() / 1000000,
+		ts,
 	}
 
-	error := logger.Post("car.xd", data)
+	error := logger.Post("vehicle.log", data)
 	if error != nil {
 	  panic(error)
 	}
+
+	if v.locationReport == nil {
+		v.locationReport = &VehicleLocationReport{
+			carId: v.carId,
+			location: make([]LocationStruct, 0),
+			startSecond: ts / 1000,
+		}
+	}
+
+	v.locationReport.location = append(v.locationReport.location, LocationStruct{
+		Lat: v.lat,
+		Lon: v.lon,
+	})
+
+	// TODO - tutaj wyliczać ile próbek w sekundzie
+	if len(v.locationReport.location) == 1000 / step_interval_ms {
+
+		locationJSON, err := json.Marshal(v.locationReport.location)
+		if err != nil {
+			panic(err)
+		}
+
+		var bboxNorth float64 = -1000
+		var bboxSouth float64 = 1000
+		var bboxEast float64 = -1000
+		var bboxWest float64 = 1000
+
+		for _, loc := range v.locationReport.location {
+			if loc.Lat > bboxNorth {
+				bboxNorth = loc.Lat
+			}
+			if loc.Lat < bboxSouth {
+				bboxSouth = loc.Lat
+			}
+			if loc.Lon > bboxEast {
+				bboxEast = loc.Lon
+			}
+			if loc.Lon < bboxWest {
+				bboxWest = loc.Lon
+			}
+		}
+
+		data2 := struct {
+			CarId int 
+			StartSecond int64
+			LocationJSON []byte
+			BboxNorth float64
+			BboxSouth float64
+			BboxEast float64
+			BboxWest float64 
+		} {
+			v.carId,
+			v.locationReport.startSecond,
+			locationJSON,
+			bboxNorth,
+			bboxSouth,
+			bboxEast,
+			bboxWest,
+		}
+
+		error := logger.Post("vehicle.map", data2)
+		if error != nil {
+			panic(error)
+		}
+
+		v.locationReport = nil
+	} 
 }
 
 func RandomVehicle(carId int) *Vehicle {
@@ -114,8 +194,6 @@ func main() {
 	for i:=0; i<vehicles_no; i += 1 {
 		vehicles[i] = RandomVehicle(i)
 	}
-
-	
 
 	for step := 1; step <= steps_no; step += 1 {
 		for i:=0; i<vehicles_no; i += 1 {

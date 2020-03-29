@@ -154,8 +154,6 @@ class LeafletMap extends React.Component{
         this.simulationVisualizationLayer = new SimulationVisualizationLayer();
         this.simulationVisualizationLayer
             .addTo(this.map);
-
-        this.elasticsearchFacade.initSearchIndexExtractTransormLoad();
     }
 
     cacheNextPingPongIfNecessary() {
