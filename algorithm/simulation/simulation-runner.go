@@ -1,10 +1,12 @@
-package main
+package simulation
 
 import (
 	"fmt"
-	"time"
-	"math/rand"
 	"math"
+	"math/rand"
+	"mzakrze/smart_city/algorithm"
+	"mzakrze/smart_city/util"
+	"time"
 )
 
 const (
@@ -95,7 +97,7 @@ func (r *SimulationRunner) initFluentdLogger() {
 
 type VehicleController struct {
 	vehicleId int
-	vehicleActor *VehicleActor
+	vehicleActor *algorithm.VehicleActor
 
 	isCurrentlyDriving bool
 	hasFinished bool
@@ -113,7 +115,7 @@ type VehicleController struct {
 }
 
 type VehicleLocationReport struct {
-	location [10]LocationStruct
+	location [10]util.LocationStruct
 	step int
 	startSecond int64
 	isEmpty bool // TODO - przepisac to
@@ -137,7 +139,7 @@ func (r *SimulationRunner) appendLocationToBucket(v* VehicleController, ts int64
 		v.locationReport.isEmpty = false
 	}
 	
-	v.locationReport.location[v.locationReport.step] = LocationStruct{
+	v.locationReport.location[v.locationReport.step] = util.LocationStruct{
 		Lat: v.vehicleActor.Lat,
 		Lon: v.vehicleActor.Lon,
 	}
@@ -267,7 +269,7 @@ func (v* VehicleController) ping(ts int64) {
 
 	if v.startTs >= ts && v.isCurrentlyDriving == false {
 		// initiate vehicleActor
-		v.vehicleActor = &VehicleActor{
+		v.vehicleActor = &algorithm.VehicleActor{
 			Lat: v.originLat,
 			Lon: v.originLon,
 			DestinationLat: v.destinationLat,

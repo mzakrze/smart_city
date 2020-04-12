@@ -1,4 +1,4 @@
-package main
+package util
 
 type LocationStruct struct {
 	Lat float64

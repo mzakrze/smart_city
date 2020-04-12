@@ -1,10 +1,13 @@
-package main
+package simulation
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/fluent/fluent-logger-golang/fluent"
-	"encoding/json"
+	"mzakrze/smart_city/util"
 )
+
+// TODO - nie exportować tych typów poza pakiet
 
 type FluentVehicleCurrentLocation struct {
 	VehicleId int
@@ -17,7 +20,7 @@ type FluentVehicleCurrentLocation struct {
 type FluentVehicleBucketLocation struct {
 	VehicleId int 
 	StartSecond int64
-	Location []LocationStruct
+	Location []util.LocationStruct
 	BboxNorth float64
 	BboxSouth float64
 	BboxEast float64
