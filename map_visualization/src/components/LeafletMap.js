@@ -35,10 +35,15 @@ class LeafletMap extends React.Component{
     componentDidMount() {
         this.map = L.map('leaflet-map-id').setView([52.218994864793, 21.011712029573467], 14);
 
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // TODO - experiment with tile servers: https://wiki.openstreetmap.org/wiki/Tile_servers
+        var mapTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 18,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(this.map);
+        });
+        mapTileLayer.addTo(this.map);
+
+        var graphTileLayer = L.tileLayer("http://localhost:8080/{z}/{x}/{y}");
+        graphTileLayer.addTo(this.map);
 
         var that = this;
 
@@ -157,6 +162,15 @@ class LeafletMap extends React.Component{
         this.simulationVisualizationLayer = new SimulationVisualizationLayer();
         this.simulationVisualizationLayer
             .addTo(this.map);
+
+        const overlayers = {
+            "vehicles": this.simulationVisualizationLayer
+        };
+        const baseLayers = {
+            "Maps": mapTileLayer,
+            "Graph": graphTileLayer,
+        };
+        L.control.layers(baseLayers, overlayers).addTo(this.map);
     }
 
     cacheNextPingPongIfNecessary() {

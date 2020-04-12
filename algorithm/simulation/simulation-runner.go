@@ -113,7 +113,8 @@ type VehicleController struct {
 }
 
 type VehicleLocationReport struct {
-	location [10]util.LocationStruct
+	// aktualnie wysylanie 1 raz na sekunde
+	location [STEPS_IN_SECOND]util.LocationStruct
 	step int
 	startSecond int64
 	isEmpty bool // TODO - przepisac to
