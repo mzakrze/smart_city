@@ -2,7 +2,7 @@
 
 curl -X PUT "localhost:9200/_template/template_simulation_map?pretty" -H 'Content-Type: application/json' -d'
 {
-    "index_patterns": [ "simulation-1-map" ],
+    "index_patterns": [ "simulation-map-1" ],
     "settings": {
         "number_of_shards": 1,
         "number_of_replicas": 0
@@ -10,14 +10,14 @@ curl -X PUT "localhost:9200/_template/template_simulation_map?pretty" -H 'Conten
     "mappings": {
         "dynamic": "strict",
         "properties": {
-            "car_id": {
+            "vehicle_id": {
                 "type": "integer"
             },
-            "startSecond": {
+            "start_second": {
                 "type": "date",
                 "format": "epoch_second"
             },
-            "location": {
+            "location_array": {
                 "type": "geo_point"
             },
             "bbox_north": {
@@ -43,7 +43,7 @@ echo ""
 
 curl -X PUT "localhost:9200/_template/template_simulation_log?pretty" -H 'Content-Type: application/json' -d'
 {
-    "index_patterns": [ "simulation-1-log" ],
+    "index_patterns": [ "simulation-log-1" ],
     "settings": {
         "number_of_shards": 1,
         "number_of_replicas": 0
@@ -51,7 +51,7 @@ curl -X PUT "localhost:9200/_template/template_simulation_log?pretty" -H 'Conten
     "mappings": {
         "dynamic": "strict",
         "properties": {
-            "car_id": {
+            "vehicle_id": {
                 "type": "integer"
             },
             "location": {

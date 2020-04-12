@@ -137,8 +137,8 @@ class LeafletMap extends React.Component{
                     
                     let index = Math.floor(step / Settings.SamplingPeriod_ms);
 
-                    for(const [vehicle_id, locationArray] of Object.entries(res)) {
-                        let p = locationArray[index];
+                    for(const [vehicle_id, location_array] of Object.entries(res)) {
+                        let p = location_array[index];
                         // TODO - new L.LatLng można robić przed włożeniem do cache
                         let point = this._map.latLngToContainerPoint(new L.LatLng(p.lat, p.lon));
 

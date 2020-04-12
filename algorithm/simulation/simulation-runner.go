@@ -56,14 +56,14 @@ func (r *SimulationRunner) initStartEnd() {
 	if err != nil { panic(err) }
 	end, err := time.Parse(time.RFC3339, SIMULATION_END_LAYOUT)
 	if err != nil { panic(err) }
-	var nanoToMs int64 = 10e6
+	const nanoToMs int64 = 10e6
+	const hackFIXME int64 = 10 // TODO - pobieram nanosekundy, zamieniam na ms, a bazie jest 10 razy za mała wartość. Pewnie na innej warstwie sie psuje, ale taki hack na szybko
 
-	r.simulationStart = int64(start.UnixNano() / nanoToMs)
-	r.simulationEnd = int64(end.UnixNano() / nanoToMs)
+	r.simulationStart = int64(start.UnixNano() / nanoToMs) * hackFIXME
+	r.simulationEnd = int64(end.UnixNano() / nanoToMs) * hackFIXME
 }
 
 func (r *SimulationRunner) initVehicleControllers() {
-	// r.vehiclesControllers = [VEHICLES_NO]VehicleController
 
 	for vehicleId := 0; vehicleId < VEHICLES_NO; vehicleId += 1 {
 		originLat 			:= rand.Float64() * (MAX_LAT - MIN_LAT) + MIN_LAT
@@ -84,9 +84,7 @@ func (r *SimulationRunner) initVehicleControllers() {
 			destinationLon: destinationLon,
 		}
 
-		// fmt.Printf("origin: %f, %f; dest: %f, %f\n", originLat, originLon, destinationLat, destinationLon)
-
-		r.vehiclesControllers[vehicleId] = vehicleController 
+		r.vehiclesControllers[vehicleId] = vehicleController
 	} 
 }
 
