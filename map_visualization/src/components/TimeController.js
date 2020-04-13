@@ -14,27 +14,27 @@ class TimeController extends React.Component {
     }
 
     componentDidMount() {
-        fetch("/simulation-log-1/_search", {
-            method: 'POST',
-            body: JSON.stringify({
-                "aggs" : {
-                    "min_date": {"min": {"field": "@timestamp"}},
-                    "max_date": {"max": {"field": "@timestamp"}}
-                }
-            }),
-            headers: {
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
-            },
-        })
-            .then(res => res.json())
-            .then(res => {
-                this.setState({
-                    min: res.aggregations.min_date.value,
-                    max: res.aggregations.max_date.value,
-                    initialized: true
-                })
-            })
+        // fetch("/simulation-log-1/_search", {
+        //     method: 'POST',
+        //     body: JSON.stringify({
+        //         "aggs" : {
+        //             "min_date": {"min": {"field": "@timestamp"}},
+        //             "max_date": {"max": {"field": "@timestamp"}}
+        //         }
+        //     }),
+        //     headers: {
+        //         'Accept': 'application/json',
+        //         'Content-Type': 'application/json'
+        //     },
+        // })
+        //     .then(res => res.json())
+        //     .then(res => {
+        //         this.setState({
+        //             min: res.aggregations.min_date.value,
+        //             max: res.aggregations.max_date.value,
+        //             initialized: true
+        //         })
+        //     })
     }
 
     renderPlayButton() {

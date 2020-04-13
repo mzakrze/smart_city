@@ -38,7 +38,8 @@ class LeafletMap extends React.Component{
         // TODO - experiment with tile servers: https://wiki.openstreetmap.org/wiki/Tile_servers
         var mapTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 18,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            opacity: 0.5
         });
         mapTileLayer.addTo(this.map);
 
@@ -164,11 +165,13 @@ class LeafletMap extends React.Component{
             .addTo(this.map);
 
         const overlayers = {
+            "Maps": mapTileLayer,
+            "Graph": graphTileLayer,
             "vehicles": this.simulationVisualizationLayer
         };
         const baseLayers = {
-            "Maps": mapTileLayer,
-            "Graph": graphTileLayer,
+            // "Maps": mapTileLayer,
+            // "Graph": graphTileLayer,
         };
         L.control.layers(baseLayers, overlayers).addTo(this.map);
     }
