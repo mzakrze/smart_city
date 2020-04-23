@@ -43,9 +43,6 @@ class LeafletMap extends React.Component{
         });
         mapTileLayer.addTo(this.map);
 
-        var graphTileLayer = L.tileLayer("http://localhost:8080/{z}/{x}/{y}");
-        graphTileLayer.addTo(this.map);
-
         var that = this;
 
         var SimulationVisualizationLayer = L.CanvasLayer.extend({
@@ -164,15 +161,45 @@ class LeafletMap extends React.Component{
         this.simulationVisualizationLayer
             .addTo(this.map);
 
+        this.graphPlotLayer = new GraphPlotLayer();
+        this.graphPlotLayer
+            .addTo(this.map);
+
+        let nodesPromise = fetch('http://localhost:3000/nodes.ndjson')
+            .then(res => res.text())
+
+        let edgesPromise = fetch('http://localhost:3000/edges.ndjson')
+            .then(res => res.text())
+
+        Promise.all([nodesPromise, edgesPromise])
+            .then(values => {
+                let nodes = {} 
+                let edges = [] 
+                for (let line of values[0].split("\n")) {
+                    if (line == "") {
+                        continue;
+                    }
+                    let n = JSON.parse(line)
+                    nodes[n.id] = n
+                }
+                for (let line of values[1].split("\n")) {
+                    if (line == "") {
+                        continue;
+                    }
+                    let e = JSON.parse(line)
+                    edges.push(e)
+                }
+
+                const graph = { nodes, edges }
+                that.graphPlotLayer.initGraphPlotLayer(graph)
+            })
+
         const overlayers = {
             "Maps": mapTileLayer,
-            "Graph": graphTileLayer,
-            "vehicles": this.simulationVisualizationLayer
+            "vehicles": this.simulationVisualizationLayer,
+            "Graph": this.graphPlotLayer
         };
-        const baseLayers = {
-            // "Maps": mapTileLayer,
-            // "Graph": graphTileLayer,
-        };
+        const baseLayers = { };
         L.control.layers(baseLayers, overlayers).addTo(this.map);
     }
 
@@ -248,5 +275,68 @@ class LeafletMap extends React.Component{
         </div>;
     }
 }
+
+
+
+const GraphPlotLayer = L.CanvasLayer.extend({
+
+    initGraphPlotLayer: function (theGraph) {
+        this.theGraph = theGraph;
+        this.initialized = true
+    },
+
+    render: function() {
+        if (!this.initialized) {
+            this.redraw();
+            return;
+        }
+
+        var canvas = this.getCanvas();
+        var ctx = canvas.getContext('2d', { alpha: false });
+
+        // clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        let nodes = {}
+        for(let nId in this.theGraph.nodes) {
+            let n = this.theGraph.nodes[nId]
+            let {x, y} = this._map.latLngToContainerPoint(new L.LatLng(n.lat, n.lon));
+            nodes[nId] = {x, y}
+            ctx.fillStyle = "#000000";
+            ctx.fillRect(x-5, y-5, 10, 10);
+        }
+
+        const canvas_arrow = (context, fromx, fromy, tox, toy) => {
+            var dx = tox - fromx;
+            var dy = toy - fromy;
+            context.moveTo(fromx, fromy);
+            context.lineTo(tox, toy);
+            // drawing arrow for debug:
+            // var angle = Math.atan2(dy, dx);
+            // var headlen = 25; // length of head in pixels
+            // context.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
+            // context.moveTo(tox, toy);
+            // context.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
+        };
+
+        for(let e of this.theGraph.edges) {
+            if (e.transitive) {
+                continue;
+            }
+            let color = "#000000";
+            let nodeFrom = nodes[e.from];
+            let nodeTo = nodes[e.to];
+
+            ctx.beginPath();
+            ctx.strokeStyle = color;
+            canvas_arrow(ctx, nodeFrom.x, nodeFrom.y, nodeTo.x, nodeTo.y)
+            ctx.stroke()
+
+        }
+
+    }
+});
+
+
 
 export default LeafletMap;
