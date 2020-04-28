@@ -303,7 +303,7 @@ const GraphPlotLayer = L.CanvasLayer.extend({
             let {x, y} = this._map.latLngToContainerPoint(new L.LatLng(n.lat, n.lon));
             nodes[nId] = {x, y}
             ctx.fillStyle = "#000000";
-            ctx.fillRect(x-5, y-5, 10, 10);
+            ctx.fillRect(x-1, y-1, 2, 2);
         }
 
         const canvas_arrow = (context, fromx, fromy, tox, toy) => {

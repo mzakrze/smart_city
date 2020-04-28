@@ -1,6 +1,8 @@
 package main
 
-import "mzakrze/smart_city/simulation"
+import (
+	"mzakrze/smart_city/simulation"
+)
 
 // TODO - wydzielić tutaj ustawienia
 

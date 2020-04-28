@@ -83,11 +83,12 @@ class ManhattanMapGenerator:
             })
 
         def generate_arc(fn1, fn2, node_from, node_to, radius, dir_x, dir_y, order):
-            edges.append({
-                "from": node_from["id"],
-                "to": node_to["id"],
-                "transitive": True
-            })
+            # TODO - pomysł na optymalizacje, do rozwazenia jeśli bedzie problem z wydajnoscia, jak nie - wyrzucic
+            # edges.append({
+            #     "from": node_from["id"],
+            #     "to": node_to["id"],
+            #     "transitive": True
+            # })
             coef1 = { "up": -1, "down": 1}[dir_x]
             coef2 = { "left": -1, "right": 1}[dir_y]
             r_x = fn1(node_from["x"], node_to["x"])
@@ -257,6 +258,5 @@ class ManhattanMapGenerator:
         for e in edges:
             e["from"] = old_to_new[e["from"]]
             e["to"] = old_to_new[e["to"]]
-
 
 
