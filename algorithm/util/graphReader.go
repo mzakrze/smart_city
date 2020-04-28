@@ -62,6 +62,9 @@ func assembleGraph(nodesRaw []node, edgesRaw []edge, mapBox types.MapBBox)  *typ
 	}
 
 	for _, e := range edgesRaw {
+		if e.Transitive {
+			continue
+		}
 		nodeFrom, ok := nodesMap[e.From]; if !ok { panic("Error when parsing graph") }
 		if nodeFrom.Id != e.From {
 			panic(fmt.Sprintf("Something not ok, wanted: %d, got: %d", e.From, nodeFrom.Id))

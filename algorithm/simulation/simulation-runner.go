@@ -19,7 +19,7 @@ const (
 	// 1 - pojawienia sie pojazdu od czasu (np 7-9 i 16-18 godziny szczytu itp.)
 	// 2 - lokalizacji
 
-	VEHICLES_NO = 1
+	VEHICLES_NO = 20
 
 	// 
 	STEPS_IN_SECOND = 1000 / STEP_INTERVAL_MS
@@ -64,8 +64,11 @@ func (r *SimulationRunner) initStartEnd() {
 
 func (r *SimulationRunner) initVehicleControllers() {
 
+	rand.Seed(time.Now().Unix())
+
 	randomStartStopLocation := func() types.DestinationPoint {
-		guard := 100
+		// FIXME - zabezpieczyć, żeby nie generowało na wyjeździe z mapy
+		guard := 1000
 		for true {
 			i := rand.Intn(len(r.RoadsGraph.AllNodes))
 			nodeFrom := r.RoadsGraph.AllNodes[i]
@@ -105,6 +108,7 @@ func (r *SimulationRunner) initVehicleControllers() {
 			startTs: startTs,
 			origin: origin,
 			destination: destination,
+			RoadsGraph: r.RoadsGraph,
 		}
 
 		r.vehiclesControllers[vehicleId] = vehicleController
@@ -148,6 +152,7 @@ type VehicleController struct {
 
 	origin types.DestinationPoint
 	destination types.DestinationPoint
+	RoadsGraph *types.Graph
 }
 
 
@@ -157,10 +162,13 @@ func (v* VehicleController) ping(ts types.Timestamp) {
 		// do nothing
 	case types.VEHICLE_DRIVING:
 		v.vehicleActor.Ping(ts)
+		if v.vehicleActor.HasFinished {
+			v.VehicleState = types.VEHICLE_FINISHED
+		}
 	case types.VEHICLE_NOT_STARTED:
 		if v.startTs >= ts {
 			// initiate vehicleActor
-			v.vehicleActor = algorithm.InitVehicleActor(v.origin, v.destination)
+			v.vehicleActor = algorithm.InitVehicleActor(v.origin, v.destination, v.RoadsGraph)
 			v.VehicleState = types.VEHICLE_DRIVING
 		}
 	}
@@ -179,7 +187,7 @@ func validateSettings() {
 
 func (r *SimulationRunner) haveAllVehiclesFinished() bool {
 	for _, v := range r.vehiclesControllers {
-		if v.VehicleState == types.VEHICLE_FINISHED {
+		if v.VehicleState != types.VEHICLE_FINISHED {
 			return false
 		}
 	}
