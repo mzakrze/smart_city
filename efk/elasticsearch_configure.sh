@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# TODO - dodac to do entry-point.sh, sprawdzac
+
 curl -X PUT "localhost:9200/_template/template_simulation_map?pretty" -H 'Content-Type: application/json' -d'
 {
     "index_patterns": [ "simulation-map-1" ],
@@ -19,6 +21,9 @@ curl -X PUT "localhost:9200/_template/template_simulation_map?pretty" -H 'Conten
             },
             "location_array": {
                 "type": "geo_point"
+            },
+            "alpha_array": {
+                "type": "float"
             },
             "bbox_north": {
                 "type": "float"
@@ -57,6 +62,9 @@ curl -X PUT "localhost:9200/_template/template_simulation_log?pretty" -H 'Conten
             "location": {
                 "type": "geo_point"
             },
+            "alpha": {
+                "type": "float"
+            },
             "speed": {
                 "type": "float"
             },
@@ -68,3 +76,5 @@ curl -X PUT "localhost:9200/_template/template_simulation_log?pretty" -H 'Conten
     }
 }
 '
+
+# FIXME - template for "trip"

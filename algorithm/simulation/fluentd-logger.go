@@ -13,15 +13,17 @@ import (
 type FluentVehicleCurrentLocation struct {
 	VehicleId types.VehicleId
 	Timestamp types.Timestamp
-	Lat types.Latitude
-	Lon types.Longitude
-	Speed float64
-} 
+	Lat       types.Latitude
+	Lon       types.Longitude
+	Alpha     float64
+	Speed     float64
+}
 
 type FluentVehicleBucketLocation struct {
 	VehicleId types.VehicleId
 	StartSecond types.Timestamp
 	Location []types.LocationStruct
+	Alpha []float64
 	BboxNorth types.Latitude
 	BboxSouth types.Latitude
 	BboxEast types.Longitude
@@ -32,6 +34,8 @@ type FluentVehicleTrip struct {
 	VehicleId types.VehicleId
 	StartTs types.Timestamp
 	EndTs types.Timestamp
+	Width types.Meter
+	Length types.Meter
 	//OriginLat float64
 	//OriginLon float64
 	//DestinationLat float64
@@ -53,9 +57,10 @@ type FluentLogger struct {
 }
 
 type VehicleLocationReport struct {
+	location    [STEPS_IN_SECOND]types.LocationStruct
 	// aktualnie wysylanie 1 raz na sekunde
-	location [STEPS_IN_SECOND]types.LocationStruct
-	step int
+	alpha       [STEPS_IN_SECOND]float64
+	step        int
 	startSecond int64
 	isEmpty bool // TODO - przepisac to
 }
@@ -87,6 +92,7 @@ func (f *FluentLogger) VehicleCurrentLocation(data *FluentVehicleCurrentLocation
 		"vehicle_id": fmt.Sprintf("%d", data.VehicleId),
 		"@timestamp": fmt.Sprintf("%d", data.Timestamp),
 		"location": location,
+		"alpha": fmt.Sprintf("%f", data.Alpha),
 		"speed": fmt.Sprintf("%f", data.Speed),
 	}
 
@@ -95,15 +101,18 @@ func (f *FluentLogger) VehicleCurrentLocation(data *FluentVehicleCurrentLocation
 
 func (f *FluentLogger) VehicleBucketLocation(data *FluentVehicleBucketLocation) {
 	bytes, err := json.Marshal(data.Location)
-	if err != nil {
-		panic(err)
-	}
+	if err != nil { panic(err) }
 	locationJson := string(bytes)
+
+	bytesAlpha, err := json.Marshal(data.Alpha)
+	if err != nil { panic(err) }
+	alphaJson := string(bytesAlpha)
 
 	msg := map[string]string {
 		"vehicle_id": fmt.Sprintf("%d", data.VehicleId),
 		"start_second": fmt.Sprintf("%d", data.StartSecond),
 		"location_array": locationJson,
+		"alpha_array": alphaJson,
 		"bbox_north": fmt.Sprintf("%f", data.BboxNorth),
 		"bbox_south": fmt.Sprintf("%f", data.BboxSouth),
 		"bbox_east": fmt.Sprintf("%f", data.BboxEast),
@@ -120,6 +129,8 @@ func (f *FluentLogger) VehicleTrip(data *FluentVehicleTrip) {
 		"vehicle_id": fmt.Sprintf("%d", data.VehicleId),
 		"start_ts": fmt.Sprintf("%d", data.StartTs),
 		"end_ts": fmt.Sprintf("%d", data.EndTs),
+		"vehicle_width": fmt.Sprintf("%f", data.Width),
+		"vehicle_length": fmt.Sprintf("%f", data.Length),
 		//"origin_lat": fmt.Sprintf("%f", data.OriginLat),
 		//"origin_lon": fmt.Sprintf("%f", data.OriginLon),
 		//"destination_lat": fmt.Sprintf("%f", data.DestinationLat),
@@ -153,6 +164,8 @@ func (f *FluentLogger) ReportVehicle(ts types.Timestamp, controller *VehicleCont
 			VehicleId: controller.vehicleId,
 			StartTs: controller.startTs,
 			EndTs: controller.endTs,
+			Width: controller.vehicleActor.Width,
+			Length: controller.vehicleActor.Length,
 			//OriginLat: v.originLat,
 			//OriginLon: v.originLon,
 			//DestinationLat: v.destinationLat,
@@ -209,6 +222,7 @@ func (f *FluentLogger) flushBucketIfFull(v *VehicleController, ts int64) {
 			VehicleId: v.vehicleId,
 			StartSecond:locationReport.startSecond,
 			Location: locationReport.location[:],
+			Alpha: locationReport.alpha[:],
 			BboxNorth: bboxNorth,
 			BboxSouth: bboxSouth,
 			BboxEast: bboxEast,
@@ -227,6 +241,7 @@ func (f *FluentLogger) flushBucketIfFull(v *VehicleController, ts int64) {
 	if locationReport == nil {
 		locationReport = &VehicleLocationReport{
 			location: [STEPS_IN_SECOND]types.LocationStruct{},
+			alpha: [STEPS_IN_SECOND]float64{},
 			isEmpty: true,
 		}
 		f.locationReport[v.vehicleId] = locationReport
@@ -241,6 +256,7 @@ func (f *FluentLogger) flushBucketIfFull(v *VehicleController, ts int64) {
 		Lat: f.yToLat(v.vehicleActor.Y),
 		Lon: f.xToLon(v.vehicleActor.X),
 	}
+	locationReport.alpha[locationReport.step] = v.vehicleActor.Alpha
 	locationReport.step += 1
 }
 
@@ -252,6 +268,7 @@ func (f *FluentLogger) flushAllReports(ts int64) {
 				VehicleId: vehicleId,
 				StartSecond: locationReport.startSecond,
 				Location: locationReport.location[:],
+				Alpha: locationReport.alpha[:],
 				BboxNorth: 1000,
 				BboxSouth: -1000,
 				BboxEast: -1000,

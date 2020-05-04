@@ -93,7 +93,11 @@ class ElasticsearchFacade {
             let result = {};
             for(let r of hits) {
                 result[r._source.vehicle_id] = r._source.location_array;
-            } 
+                // TODO - może lepiej robić to w ES - będzie wydajniej
+                for (let index in result[r._source.vehicle_id]) {
+                    result[r._source.vehicle_id][index].alpha = r._source.alpha_array[index]
+                }
+            }
             if (res.hits.total > sizeParam) {
                 console.error("Not every vehicle is showed!!! Total number of records exceeds " + sizeParam + " (max for Elasticsearch)")
             }

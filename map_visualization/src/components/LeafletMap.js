@@ -3,6 +3,7 @@ import './LeafletMap.css';
 import './LeafletCanvasLayer.js';
 import ElasticsearchFacade from './ElasticsearchFacade.js';
 import { Settings } from './../App.js';
+import TripIndexFacade from "./TripIndexFacade";
 
 const L = window.L;
 class LeafletMap extends React.Component{
@@ -30,6 +31,10 @@ class LeafletMap extends React.Component{
 
         this.map = null;
         this.simulationVisualizationLayer = null;
+        new TripIndexFacade().getVehicleIdToSizeMap()
+            .then((value => {
+                this.vehicleIdToSizeMap = value
+            }))
     }
 
     componentDidMount() {
@@ -56,9 +61,21 @@ class LeafletMap extends React.Component{
                 ctx.stroke();
             },
 
-            renderVehicle: function(ctx, location) {
+            renderVehicle: function(ctx, location, size, metersToPixelsX, metersToPixelsY, alpha) {
                 ctx.fillStyle = 'rgba(255, 0, 60, 1)';
-                ctx.fillRect(location.x, location.y, 5, 5);
+                let w = size.width * metersToPixelsX;
+                let l = size.length * metersToPixelsY;
+                w = Math.max(w, 6);
+                l = Math.max(l, 6);
+                let locationCorner = {x: location.x - l/2, y: location.y - w/2};
+
+                // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Transformations
+                ctx.save();
+                ctx.translate(locationCorner.x + l/2, locationCorner.y + w/2);
+                ctx.rotate(alpha);
+                ctx.translate(-locationCorner.x - l/2, -locationCorner.y - w/2);
+                ctx.fillRect(locationCorner.x, locationCorner.y, l, w);
+                ctx.restore();
             },
 
             render: function() {
@@ -76,7 +93,7 @@ class LeafletMap extends React.Component{
                     this.renderCircle(ctx, point, (1.0 + Math.sin(Date.now()*0.001))*100);
 
 
-                    
+
                 }
 
                 if (that.runningSimulationRev != that.startSimulationRev) {
@@ -84,6 +101,16 @@ class LeafletMap extends React.Component{
                     that.runningSimulationRev = that.startSimulationRev;
                     that.startSimulationTS = new Date().getTime(); 
                 }
+
+                // TODO - cache it - once per zoom
+                const widthPixels = this._map.getSize().x;
+                const heightPixels = this._map.getSize().y;
+
+                const widthMeters = this._map.containerPointToLatLng([0, 0]).distanceTo(this._map.containerPointToLatLng([widthPixels, 0]));
+                const heightMeters = this._map.containerPointToLatLng([0, 0]).distanceTo(this._map.containerPointToLatLng([0, heightPixels]));
+
+                const METERS_TO_PIXELS_X = widthPixels / widthMeters;
+                const METERS_TO_PIXELS_Y = heightPixels / heightMeters;
 
                 if (that.runningSimulationRev != null) {
                  
@@ -144,8 +171,8 @@ class LeafletMap extends React.Component{
                         let p = location_array[index];
                         // TODO - new L.LatLng można robić przed włożeniem do cache
                         let point = this._map.latLngToContainerPoint(new L.LatLng(p.lat, p.lon));
-
-                        this.renderVehicle(ctx, point);
+                        let size = that.vehicleIdToSizeMap[vehicle_id];
+                        this.renderVehicle(ctx, point, size, METERS_TO_PIXELS_X, METERS_TO_PIXELS_Y, p.alpha);
                     }
 
                 }
@@ -165,6 +192,13 @@ class LeafletMap extends React.Component{
         this.graphPlotLayer
             .addTo(this.map);
 
+        var scale = L.control.scale({
+            metric: true,
+            imperial: false
+        }).addTo(this.map);
+
+
+        // FIXME - do poprawy przed przeniesieniem na inne srodowisko
         let nodesPromise = fetch('http://localhost:3000/nodes.ndjson')
             .then(res => res.text())
 

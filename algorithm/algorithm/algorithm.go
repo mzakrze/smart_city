@@ -27,7 +27,9 @@ type VehicleActor struct {
 	X types.XCoord
 	Y types.YCoord
 	Speed_mps float64
-	// TODO width and height, alpha
+	Alpha float64
+	Width types.Meter
+	Length types.Meter
 
 	HasFinished bool
 
@@ -43,6 +45,8 @@ func InitVehicleActor(origin, destination types.DestinationPoint, roadGraph *typ
 		X: origin.X,
 		Y: origin.Y,
 		Speed_mps: 5,
+		Width: 1.981,
+		Length: 4.636,
 		roadGraph: roadGraph,
 	}
 
@@ -86,6 +90,7 @@ func (v *VehicleActor) move(distSpare types.Meter) {
 
 	v.X += moveX
 	v.Y += moveY
+	v.Alpha = math.Acos(-xDiff / d)
 
 	improvementX := math.Abs(dest.X - beforeX) - math.Abs(dest.X - v.X)
 	if improvementX < 0 {

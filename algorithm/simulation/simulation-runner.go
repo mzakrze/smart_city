@@ -196,6 +196,7 @@ func (r *SimulationRunner) haveAllVehiclesFinished() bool {
 
 func (r *SimulationRunner) RunSimulation() {
 
+	// TODO - coś do śledzenia progresu, np: https://github.com/machinebox/progress
 	ts := r.simulationStart
 	for ; ts <= r.simulationEnd || ! r.haveAllVehiclesFinished(); ts += STEP_INTERVAL_MS {
 
