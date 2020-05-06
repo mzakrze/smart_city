@@ -10,7 +10,7 @@ curl -X PUT "localhost:9200/_template/template_simulation_map?pretty" -H 'Conten
         "number_of_replicas": 0
     },
     "mappings": {
-        "dynamic": "strict",
+        "dynamic": true,
         "properties": {
             "vehicle_id": {
                 "type": "integer"
@@ -54,7 +54,7 @@ curl -X PUT "localhost:9200/_template/template_simulation_log?pretty" -H 'Conten
         "number_of_replicas": 0
     },
     "mappings": {
-        "dynamic": "strict",
+        "dynamic": true,
         "properties": {
             "vehicle_id": {
                 "type": "integer"

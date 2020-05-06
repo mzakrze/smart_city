@@ -28,7 +28,8 @@ type edge struct {
 	From types.NodeId
 	To types.NodeId
 	Transitive bool
-
+	Arc bool
+	Internal bool
 }
 
 
@@ -71,7 +72,7 @@ func assembleGraph(nodesRaw []node, edgesRaw []edge, mapBox types.MapBBox)  *typ
 		}
 		nodeTo, ok := nodesMap[e.To]; if !ok { panic("Error when parsing graph") }
 		distance := math.Sqrt((nodeFrom.X - nodeTo.X) * (nodeFrom.X - nodeTo.X) + (nodeFrom.Y - nodeTo.Y) * (nodeFrom.Y - nodeTo.Y))
-		edge := types.Edge{To: nodeTo, Distance: distance}
+		edge := types.Edge{To: nodeTo, Distance: distance, IsArc: e.Arc, IsInternal: e.Internal}
 		nodeFrom.Edges = append(nodeFrom.Edges, edge)
 	}
 

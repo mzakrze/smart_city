@@ -17,6 +17,8 @@ type FluentVehicleCurrentLocation struct {
 	Lon       types.Longitude
 	Alpha     float64
 	Speed     float64
+	MoveX     float64
+	MoveY     float64
 }
 
 type FluentVehicleBucketLocation struct {
@@ -93,6 +95,8 @@ func (f *FluentLogger) VehicleCurrentLocation(data *FluentVehicleCurrentLocation
 		"@timestamp": fmt.Sprintf("%d", data.Timestamp),
 		"location": location,
 		"alpha": fmt.Sprintf("%f", data.Alpha),
+		"movex": fmt.Sprintf("%f", data.MoveX),
+		"movey": fmt.Sprintf("%f", data.MoveY),
 		"speed": fmt.Sprintf("%f", data.Speed),
 	}
 

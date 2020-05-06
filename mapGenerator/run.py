@@ -24,9 +24,9 @@ parser = argparse.ArgumentParser(description='Generates city map as a graph.')
 
 parser.add_argument('--type', required=True, type=Algorithm.from_string, choices=list(Algorithm), help='Algorithm used for generating city map')
 parser.add_argument('--bbox_north', default="52.2254000", required=False, help='Bounding box for generated map')
-parser.add_argument('--bbox_south', default="52.2221000", required=False, help='Bounding box for generated map')
-parser.add_argument('--bbox_west', default="21.0220000", required=False, help='Bounding box for generated map')
-parser.add_argument('--bbox_east', default="21.0353000", required=False, help='Bounding box for generated map')
+parser.add_argument('--bbox_south', default="52.2231000", required=False, help='Bounding box for generated map')
+parser.add_argument('--bbox_west', default="21.0233000", required=False, help='Bounding box for generated map')
+parser.add_argument('--bbox_east', default="21.0263000", required=False, help='Bounding box for generated map')
 
 args = parser.parse_args()
 

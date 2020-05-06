@@ -29,10 +29,11 @@ class ManhattanMapGenerator:
                     raise Exception("Not unique id !")
                 unique_ids[node["id"]] = True
 
-        def add_edge(node_from, node_to):
+        def add_edge_arc(node_from, node_to):
             edges.append({
                 "from": node_from["id"],
                 "to": node_to["id"],
+                "arc": True,
             })
 
         def connect_up(node):
@@ -82,17 +83,66 @@ class ManhattanMapGenerator:
                 "to": neighbour
             })
 
-        def generate_arc(fn1, fn2, node_from, node_to, radius, dir_x, dir_y, order):
-            # TODO - pomysł na optymalizacje, do rozwazenia jeśli bedzie problem z wydajnoscia, jak nie - wyrzucic
-            # edges.append({
-            #     "from": node_from["id"],
-            #     "to": node_to["id"],
-            #     "transitive": True
-            # })
-            coef1 = { "up": -1, "down": 1}[dir_x]
-            coef2 = { "left": -1, "right": 1}[dir_y]
-            r_x = fn1(node_from["x"], node_to["x"])
-            r_y = fn2(node_from["y"], node_to["y"])
+        def generate_arc(node_from, node_to, radius, turn_dir, quarter):
+            """
+            quarter:\n
+            1|2\n
+            4|3
+            """
+            if quarter == 1:
+                if turn_dir == "right":
+                    r_x = max(node_from["x"], node_to["x"])
+                    r_y = min(node_from["y"], node_to["y"])
+                    coef1 = -1
+                    coef2 = 1
+                    order = False
+                if turn_dir == "left":
+                    r_x = max(node_from["x"], node_to["x"])
+                    r_y = min(node_from["y"], node_to["y"])
+                    coef1 = -1
+                    coef2 = 1
+                    order = True
+            elif quarter == 2:
+                if turn_dir == "right":
+                    r_x = min(node_from["x"], node_to["x"])
+                    r_y = min(node_from["y"], node_to["y"])
+                    coef1 = 1
+                    coef2 = 1
+                    order = True
+                if turn_dir == "left":
+                    r_x = min(node_from["x"], node_to["x"])
+                    r_y = min(node_from["y"], node_to["y"])
+                    coef1 = 1
+                    coef2 = 1
+                    order = False
+            elif quarter == 3:
+                if turn_dir == "right":
+                    r_x = min(node_from["x"], node_to["x"])
+                    r_y = max(node_from["y"], node_to["y"])
+                    coef1 = 1
+                    coef2 = -1
+                    order = False
+                if turn_dir == "left":
+                    r_x = min(node_from["x"], node_to["x"])
+                    r_y = max(node_from["y"], node_to["y"])
+                    coef1 = 1
+                    coef2 = -1
+                    order = True
+            elif quarter == 4:
+                if turn_dir == "right":
+                    r_x = max(node_from["x"], node_to["x"])
+                    r_y = max(node_from["y"], node_to["y"])
+                    coef1 = -1
+                    coef2 = -1
+                    order = True
+                if turn_dir == "left":
+                    r_x = max(node_from["x"], node_to["x"])
+                    r_y = max(node_from["y"], node_to["y"])
+                    coef1 = -1
+                    coef2 = -1
+                    order = False
+            else:
+                raise Exception("Illegal quarter argument")
             STEPS = 10
             prev = None
             for n in range(1, STEPS):
@@ -106,35 +156,143 @@ class ManhattanMapGenerator:
                     if order:
                         edges.append({
                             "from": node_from["id"],
-                            "to": d["id"]
+                            "to": d["id"],
+                            "arc": True,
                         })
                     else:
                         edges.append({
                             "from": d["id"],
-                            "to": node_to["id"]
+                            "to": node_to["id"],
+                            "arc": True,
                         })
                 else:
                     if order:
                         edges.append({
                             "from": prev["id"],
-                            "to": d["id"]
+                            "to": d["id"],
+                            "arc": True,
                         })
                     else:
                         edges.append({
                             "from": d["id"],
-                            "to": prev["id"]
+                            "to": prev["id"],
+                            "arc": True,
                         })
                 prev = { "x": d["x"], "y": d["y"], "id": d["id"] }
             if order:
                 edges.append({
                     "from": prev["id"],
-                    "to": node_to["id"]
+                    "to": node_to["id"],
+                    "arc": True,
                 })
             else:
                 edges.append({
                     "from": node_from["id"],
-                    "to": prev["id"]
+                    "to": prev["id"],
+                    "arc": True,
                 })
+
+        def add_internal_roads():
+            nonlocal edges
+            nonlocal nodes
+            new_edges = []
+            for e in edges:
+                if "arc" in e and e["arc"]:
+                    new_edges.append(e)
+                    continue
+
+                x_from = e["from"][0]
+                y_from = e["from"][1]
+                x_to = e["to"][0]
+                y_to = e["to"][1]
+
+                if x_from != x_to:
+                    new_edges.append(e)
+                    continue
+
+                if y_from >= y_to:
+                    new_edges.append(e)
+                    continue
+
+                if y_to - y_from <= Config.GRID_SIZE/ 2:
+                    new_edges.append(e)
+                    continue
+
+                n1 = {
+                    "x": x_from,
+                    "y": y_from + Config.GRID_SIZE / 4 - Config.LANE_WIDTH / 2,
+                }
+                n2 = {
+                    "x": n1["x"] + Config.LANE_WIDTH / 2,
+                    "y": n1["y"] + Config.LANE_WIDTH / 2
+                }
+                n3 = {
+                    "x": n2["x"] + Config.GRID_SIZE / 4,
+                    "y": n2["y"],
+                }
+                n4 = {
+                    "x": n3["x"],
+                    "y": n3["y"] + Config.GRID_SIZE / 2 - Config.LANE_WIDTH / 2,
+                }
+                n5 = {
+                    "x": n4["x"] - Config.GRID_SIZE / 4,
+                    "y": n4["y"],
+                }
+                n6 = {
+                    "x": n5["x"] - Config.LANE_WIDTH / 2,
+                    "y": n5["y"] + Config.LANE_WIDTH / 2,
+                }
+
+                generate_id(n1)
+                nodes.append(n1)
+                new_edges.append({
+                    "from": e["from"],
+                    "to": n1["id"],
+                })
+
+                generate_id(n2)
+                nodes.append(n2)
+                generate_arc(n1, n2, Config.LANE_WIDTH / 2, "right", 1)
+
+                generate_id(n3)
+                nodes.append(n3)
+                new_edges.append({
+                    "from": n2["id"],
+                    "to": n3["id"],
+                })
+
+                generate_id(n4)
+                nodes.append(n4)
+                new_edges.append({
+                    "from": n3["id"],
+                    "to": n4["id"],
+                    "internal": True,
+                })
+
+                generate_id(n5)
+                nodes.append(n5)
+                new_edges.append({
+                    "from": n4["id"],
+                    "to": n5["id"],
+                })
+
+                generate_id(n6)
+                nodes.append(n6)
+                generate_arc(n5, n6, Config.LANE_WIDTH / 2, "right", 4)
+
+                new_edges.append({
+                    "from": n1["id"],
+                    "to": n6["id"],
+                })
+
+                new_edges.append({
+                    "from": n6["id"],
+                    "to": e["to"],
+                })
+
+
+            return new_edges, nodes
+
 
         nodes = []
         edges = []
@@ -200,39 +358,41 @@ class ManhattanMapGenerator:
             connect_left(n_8)
             connect_right(n_4)
 
-            generate_arc(max, max, n_3, n_2, Config.LANE_WIDTH / 2,   "up", "left", True)
-            generate_arc(max, min, n_3, n_6, Config.LANE_WIDTH * 1.5, "up",  "right", True) # TODO powinno byc down i left (ale dziala tak, ergo: funkcja jest źle zdefiniowana), poprawic tez nizej
-            add_edge(n_3, n_8)
-            generate_arc(max, min, n_5, n_4, Config.LANE_WIDTH / 2,   "up",  "right", False)
-            generate_arc(min, min, n_5, n_8, Config.LANE_WIDTH * 1.5,  "down",  "right", False) # powinny byc up i left
-            add_edge(n_5, n_2)
-            generate_arc(min, min, n_7, n_6, Config.LANE_WIDTH / 2,   "down",  "right", True)
-            generate_arc(min, max, n_7, n_2, Config.LANE_WIDTH * 1.5,  "down",  "left", True) # powinno byc up i right
-            add_edge(n_7, n_4)
-            generate_arc(min, max, n_1, n_8, Config.LANE_WIDTH / 2,   "down",  "left", False)
-            generate_arc(max, max, n_1, n_4, Config.LANE_WIDTH * 1.5,  "up",  "left", False) # powinno byc down i right
-            add_edge(n_1, n_6)
+            generate_arc(n_3, n_2, Config.LANE_WIDTH / 2, "right", 4)
+            generate_arc(n_3, n_6, Config.LANE_WIDTH * 1.5, "left", 1)
+            add_edge_arc(n_3, n_8)
+            generate_arc(n_5, n_4, Config.LANE_WIDTH / 2, "right", 1)
+            generate_arc(n_5, n_8, Config.LANE_WIDTH * 1.5, "left", 2)
+            add_edge_arc(n_5, n_2)
+            generate_arc(n_7, n_6, Config.LANE_WIDTH / 2, "right", 2)
+            generate_arc(n_7, n_2, Config.LANE_WIDTH * 1.5, "left", 3)
+            add_edge_arc(n_7, n_4)
+            generate_arc(n_1, n_8, Config.LANE_WIDTH / 2, "right", 3)
+            generate_arc(n_1, n_4, Config.LANE_WIDTH * 1.5, "left", 4)
+            add_edge_arc(n_1, n_6)
 
             if n_7["x"] == LEFT_LANE_X:
                 edges.append({
                     "from": (0, n_7["y"]),
-                    "to": n_7["id"]
+                    "to": n_7["id"],
                 })
             if n_3["x"] == RIGHT_LANE_X:
                 edges.append({
                     "from": (self.map_width, n_3["y"]),
-                    "to": n_3["id"]
+                    "to": n_3["id"],
                 })
             if n_1["y"] == TOP_LANE_Y:
                 edges.append({
-                    "from": (n_1["x"], self.map_height),
-                    "to": n_1["id"]
+                    "from":(n_1["x"], self.map_height),
+                    "to":  n_1["id"],
                 })
             if n_5["y"] == BOTTOM_LANE_Y:
                 edges.append({
                     "from": (n_5["x"], 0),
-                    "to": n_5["id"]
+                    "to": n_5["id"],
                 })
+
+        edges, nodes = add_internal_roads()
 
         self.fix_nodes_ids(nodes, edges)
 

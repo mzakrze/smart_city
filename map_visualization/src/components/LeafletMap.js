@@ -72,7 +72,9 @@ class LeafletMap extends React.Component{
                 // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Transformations
                 ctx.save();
                 ctx.translate(locationCorner.x + l/2, locationCorner.y + w/2);
+
                 ctx.rotate(alpha);
+
                 ctx.translate(-locationCorner.x - l/2, -locationCorner.y - w/2);
                 ctx.fillRect(locationCorner.x, locationCorner.y, l, w);
                 ctx.restore();

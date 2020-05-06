@@ -66,39 +66,46 @@ func (r *SimulationRunner) initVehicleControllers() {
 
 	rand.Seed(time.Now().Unix())
 
-	randomStartStopLocation := func() types.DestinationPoint {
-		// FIXME - zabezpieczyć, żeby nie generowało na wyjeździe z mapy
-		guard := 1000
-		for true {
-			i := rand.Intn(len(r.RoadsGraph.AllNodes))
-			nodeFrom := r.RoadsGraph.AllNodes[i]
-			for _, e := range nodeFrom.Edges {
-				// to jest aby rozpoznac edge, który jest faktycznie drogą, a nie łukiem na zakrecie
-				// TODO - w generowaniu grafu, oznaczac explicite co jest arc'em
-				if e.Distance > 10 {
-					x := (nodeFrom.X + e.To.X) / 2
-					y := (nodeFrom.Y + e.To.Y) / 2
-					return types.DestinationPoint{
-						NodeFirst: nodeFrom.Id,
-						NodeSecond: e.To.Id,
-						X: x,
-						Y: y,
-					}
+	destinations := []types.DestinationPoint{}
+	for i := range r.RoadsGraph.AllNodes {
+		nodeFrom := r.RoadsGraph.AllNodes[i]
+		for _, e := range nodeFrom.Edges {
+			if e.IsInternal {
+				x := (nodeFrom.X + e.To.X) / 2
+				y := (nodeFrom.Y + e.To.Y) / 2
+
+				d := types.DestinationPoint{
+					NodeFirst: nodeFrom.Id,
+					NodeSecond: e.To.Id,
+					X: x,
+					Y: y,
 				}
-			}
-			// try again
-			guard -= 1
-			if guard == 0 {
-				panic("Error while generating random location")
+
+				destinations = append(destinations,  d)
 			}
 		}
-		// not really a panic, Go cant see
-		panic("")
+	}
+
+	randomStartStopLocation := func() (types.DestinationPoint, types.DestinationPoint) {
+		const maxTries = 100
+		guard := 0
+		for true {
+			i1 := rand.Intn(len(destinations))
+			i2 := rand.Intn(len(destinations))
+			if i1 != i2 {
+				return destinations[i1], destinations[i2]
+			}
+			guard++
+			if guard >= maxTries {
+				break
+			}
+			// try again
+		}
+		panic(fmt.Sprintf("Error, could find random destination after %d tries.", maxTries))
 	}
 
 	for vehicleId := 0; vehicleId < VEHICLES_NO; vehicleId += 1 {
-		origin := randomStartStopLocation()
-		destination := randomStartStopLocation()
+		origin, destination := randomStartStopLocation()
 
 		startTs	:= r.simulationStart // TODO losować
 
@@ -135,7 +142,7 @@ func (r *SimulationRunner) initFluentdLogger() {
 		return y / height* (n - s) + s
 	}
 	xToLon := func(x types.XCoord) types.Longitude {
-		return x / width * (w - e) + e
+		return x / width * (e - w) + w
 	}
 
 	r.logger = NewFluentdLogger(lonToX, latToY, yToLat, xToLon)

@@ -65,6 +65,8 @@ type Edge struct {
 	// TODO - w przyszlosci wynik dzialania IM: latency, delay
 	To *Node
 	Distance Meter
+	IsArc bool
+	IsInternal bool
 }
 
 type IntersectionManager struct {
