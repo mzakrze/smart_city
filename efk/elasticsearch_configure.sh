@@ -25,18 +25,6 @@ curl -X PUT "localhost:9200/_template/template_simulation_map?pretty" -H 'Conten
             "alpha_array": {
                 "type": "float"
             },
-            "bbox_north": {
-                "type": "float"
-            },
-            "bbox_south": {
-                "type": "float"
-            },
-            "bbox_east": {
-                "type": "float"
-            },
-            "bbox_west": {
-                "type": "float"
-            }
         }
     }
 }

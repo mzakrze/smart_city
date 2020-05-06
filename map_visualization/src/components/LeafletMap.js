@@ -38,13 +38,13 @@ class LeafletMap extends React.Component{
     }
 
     componentDidMount() {
-        this.map = L.map('leaflet-map-id').setView([52.218994864793, 21.011712029573467], 14);
+        this.map = L.map('leaflet-map-id').setView([52.223510, 21.0238], 19);
 
         // TODO - experiment with tile servers: https://wiki.openstreetmap.org/wiki/Tile_servers
         var mapTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 18,
+            maxZoom: 21,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-            opacity: 0.5
+            opacity: 0.0 // FIXME - taki hack - dzięki temu tilelayer działa nam przesuwanie i zoomowanie, dajemy opacity 0 bo nie potrzebujemy tej mapy
         });
         mapTileLayer.addTo(this.map);
 
@@ -231,7 +231,6 @@ class LeafletMap extends React.Component{
             })
 
         const overlayers = {
-            "Maps": mapTileLayer,
             "vehicles": this.simulationVisualizationLayer,
             "Graph": this.graphPlotLayer
         };
@@ -356,9 +355,6 @@ const GraphPlotLayer = L.CanvasLayer.extend({
         };
 
         for(let e of this.theGraph.edges) {
-            if (e.transitive) {
-                continue;
-            }
             let color = "#000000";
             let nodeFrom = nodes[e.from];
             let nodeTo = nodes[e.to];

@@ -80,10 +80,6 @@ class ElasticsearchFacade {
                     bool: {
                         filter: [
                             { term: { start_second: epochSecond }},
-                            { range: { bbox_north : {gte: boundBox.south }}},
-                            { range: { bbox_south : {lte: boundBox.north }}},
-                            { range: { bbox_east : {gte: boundBox.west }}},
-                            { range: { bbox_west : {lte: boundBox.east }}},
                         ]
                     }
                 }})})

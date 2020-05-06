@@ -20,6 +20,8 @@ type node struct {
 	Id int32
 	X float64
 	Y float64
+	Entrypoint int
+	Exitpoint int
 	Lat float64
 	Lon float64
 }
@@ -27,9 +29,7 @@ type node struct {
 type edge struct {
 	From types.NodeId
 	To types.NodeId
-	Transitive bool
 	Arc bool
-	Internal bool
 }
 
 
@@ -52,6 +52,8 @@ func assembleGraph(nodesRaw []node, edgesRaw []edge, mapBox types.MapBBox)  *typ
 			Id: n.Id,
 			X: n.X,
 			Y: n.Y,
+			IsEntrypoint: n.Entrypoint,
+			IsExitpoint: n.Exitpoint,
 			Edges: []types.Edge{},
 		}
 
@@ -63,16 +65,13 @@ func assembleGraph(nodesRaw []node, edgesRaw []edge, mapBox types.MapBBox)  *typ
 	}
 
 	for _, e := range edgesRaw {
-		if e.Transitive {
-			continue
-		}
 		nodeFrom, ok := nodesMap[e.From]; if !ok { panic("Error when parsing graph") }
 		if nodeFrom.Id != e.From {
 			panic(fmt.Sprintf("Something not ok, wanted: %d, got: %d", e.From, nodeFrom.Id))
 		}
 		nodeTo, ok := nodesMap[e.To]; if !ok { panic("Error when parsing graph") }
 		distance := math.Sqrt((nodeFrom.X - nodeTo.X) * (nodeFrom.X - nodeTo.X) + (nodeFrom.Y - nodeTo.Y) * (nodeFrom.Y - nodeTo.Y))
-		edge := types.Edge{To: nodeTo, Distance: distance, IsArc: e.Arc, IsInternal: e.Internal}
+		edge := types.Edge{To: nodeTo, Distance: distance, IsArc: e.Arc}
 		nodeFrom.Edges = append(nodeFrom.Edges, edge)
 	}
 

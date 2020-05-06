@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/fluent/fluent-logger-golang/fluent"
-	"math"
 	"mzakrze/smart_city/types"
 )
 
@@ -26,10 +25,6 @@ type FluentVehicleBucketLocation struct {
 	StartSecond types.Timestamp
 	Location []types.LocationStruct
 	Alpha []float64
-	BboxNorth types.Latitude
-	BboxSouth types.Latitude
-	BboxEast types.Longitude
-	BboxWest types.Longitude
 }
 
 type FluentVehicleTrip struct {
@@ -117,10 +112,6 @@ func (f *FluentLogger) VehicleBucketLocation(data *FluentVehicleBucketLocation) 
 		"start_second": fmt.Sprintf("%d", data.StartSecond),
 		"location_array": locationJson,
 		"alpha_array": alphaJson,
-		"bbox_north": fmt.Sprintf("%f", data.BboxNorth),
-		"bbox_south": fmt.Sprintf("%f", data.BboxSouth),
-		"bbox_east": fmt.Sprintf("%f", data.BboxEast),
-		"bbox_west": fmt.Sprintf("%f", data.BboxWest),
 	}
 
 	// fmt.Printf("Sending map, vehicle_id = %d\n", data.VehicleId)
@@ -202,35 +193,12 @@ func (f *FluentLogger) reportCurrentLocation(v* VehicleController, ts types.Time
 func (f *FluentLogger) flushBucketIfFull(v *VehicleController, ts int64) {
 	locationReport := f.locationReport[v.vehicleId]
 	if locationReport.step == cap(locationReport.location) {
-		var bboxNorth float64 = -math.MaxFloat64
-		var bboxSouth float64 = math.MaxFloat64
-		var bboxEast float64 = -math.MaxFloat64
-		var bboxWest float64 = math.MaxFloat64
-
-		for _, loc := range locationReport.location {
-			if loc.Lat > bboxNorth {
-				bboxNorth = loc.Lat
-			}
-			if loc.Lat < bboxSouth {
-				bboxSouth = loc.Lat
-			}
-			if loc.Lon > bboxEast {
-				bboxEast = loc.Lon
-			}
-			if loc.Lon < bboxWest {
-				bboxWest = loc.Lon
-			}
-		}
 
 		data := &FluentVehicleBucketLocation{
 			VehicleId: v.vehicleId,
 			StartSecond:locationReport.startSecond,
 			Location: locationReport.location[:],
 			Alpha: locationReport.alpha[:],
-			BboxNorth: bboxNorth,
-			BboxSouth: bboxSouth,
-			BboxEast: bboxEast,
-			BboxWest: bboxWest,
 		}
 
 		f.VehicleBucketLocation(data)
@@ -273,11 +241,6 @@ func (f *FluentLogger) flushAllReports(ts int64) {
 				StartSecond: locationReport.startSecond,
 				Location: locationReport.location[:],
 				Alpha: locationReport.alpha[:],
-				BboxNorth: 1000,
-				BboxSouth: -1000,
-				BboxEast: -1000,
-				BboxWest: 1000,
-				// FIXME - te boundy wyliczyć
 			}
 
 			f.VehicleBucketLocation(data)

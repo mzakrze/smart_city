@@ -69,7 +69,6 @@ func InitVehicleActor(origin, destination types.DestinationPoint, roadGraph *typ
 	res.planRoute()
 
 	return res
-	// TODO - wlaczanie sie do ruchu
 }
 
 func (v *VehicleActor) move(distSpare types.Meter) {

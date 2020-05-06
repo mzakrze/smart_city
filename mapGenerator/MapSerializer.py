@@ -6,7 +6,10 @@ META_FILE = "../map_visualization/public/graph.json"
 
 class MapSerializer:
 
-    def serialize(self, bbox, graph):
+    def serialize(self, graph):
+
+        # FIXME - calculate bbox
+        bbox = {"north": 52.2254, "south": 52.2231, "west": 21.0233, "east": 21.0263, "width": 204, "height": 255}
 
         self.add_coords(bbox, graph)
 

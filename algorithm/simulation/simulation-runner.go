@@ -15,11 +15,7 @@ const (
 	SIMULATION_START_LAYOUT 	= "2020-01-01T20:00:00.000Z"
 	SIMULATION_END_LAYOUT 		= "2020-01-01T21:00:00.000Z"
 
-	// TODO - funkcja rozkladu prawdopodobienstwa:
-	// 1 - pojawienia sie pojazdu od czasu (np 7-9 i 16-18 godziny szczytu itp.)
-	// 2 - lokalizacji
-
-	VEHICLES_NO = 20
+	VEHICLES_NO = 50
 
 	// 
 	STEPS_IN_SECOND = 1000 / STEP_INTERVAL_MS
@@ -66,46 +62,53 @@ func (r *SimulationRunner) initVehicleControllers() {
 
 	rand.Seed(time.Now().Unix())
 
-	destinations := []types.DestinationPoint{}
-	for i := range r.RoadsGraph.AllNodes {
-		nodeFrom := r.RoadsGraph.AllNodes[i]
-		for _, e := range nodeFrom.Edges {
-			if e.IsInternal {
-				x := (nodeFrom.X + e.To.X) / 2
-				y := (nodeFrom.Y + e.To.Y) / 2
+	entrypoints := []types.DestinationPoint{}
+	exitpoints := []types.DestinationPoint{}
+	for _, n := range r.RoadsGraph.AllNodes {
+		if n.IsEntrypoint != 0 {
+			// z kazdego entrypointu zawsze dokladnie 1 edge
+			nodeTo := n.Edges[0].To
+			d := types.DestinationPoint{
+				NodeFirst: n.Id,
+				NodeSecond: nodeTo.Id,
+				X: n.X,
+				Y: n.Y,
+				Cluster: n.IsEntrypoint,
+			}
 
-				d := types.DestinationPoint{
-					NodeFirst: nodeFrom.Id,
-					NodeSecond: e.To.Id,
-					X: x,
-					Y: y,
+			entrypoints = append(entrypoints, d)
+		} else {
+			for _, e := range n.Edges {
+				if e.To.IsExitpoint != 0 {
+					nodeTo := e.To
+					d := types.DestinationPoint{
+						NodeFirst: n.Id,
+						NodeSecond: nodeTo.Id,
+						X: nodeTo.X,
+						Y: nodeTo.Y,
+						Cluster: e.To.IsExitpoint,
+					}
+
+					exitpoints = append(exitpoints, d)
 				}
-
-				destinations = append(destinations,  d)
 			}
 		}
 	}
 
-	randomStartStopLocation := func() (types.DestinationPoint, types.DestinationPoint) {
-		const maxTries = 100
-		guard := 0
-		for true {
-			i1 := rand.Intn(len(destinations))
-			i2 := rand.Intn(len(destinations))
-			if i1 != i2 {
-				return destinations[i1], destinations[i2]
+	getRandomWithDifferentCluster := func (points []types.DestinationPoint, cluster types.RoadCluster) types.DestinationPoint {
+		maxTries := 100
+		for i := 0; i < maxTries; i++ {
+			r := points[rand.Intn(len(points))]
+			if r.Cluster != cluster {
+				return  r
 			}
-			guard++
-			if guard >= maxTries {
-				break
-			}
-			// try again
 		}
-		panic(fmt.Sprintf("Error, could find random destination after %d tries.", maxTries))
+		panic("Fail after 100 tries")
 	}
 
 	for vehicleId := 0; vehicleId < VEHICLES_NO; vehicleId += 1 {
-		origin, destination := randomStartStopLocation()
+		origin := entrypoints[rand.Intn(len(entrypoints))]
+		destination := getRandomWithDifferentCluster(exitpoints, origin.Cluster)
 
 		startTs	:= r.simulationStart // TODO losować
 

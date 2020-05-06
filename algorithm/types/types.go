@@ -16,6 +16,8 @@ type Timestamp = int64
 
 type VehicleState = int
 
+type RoadCluster = int
+
 const (
 	VEHICLE_NOT_STARTED VehicleState = 1 + iota
 	VEHICLE_DRIVING
@@ -28,6 +30,7 @@ type DestinationPoint struct {
 	NodeSecond NodeId
 	X XCoord
 	Y YCoord
+	Cluster RoadCluster
 }
 
 type LocationStruct struct {
@@ -54,19 +57,21 @@ type MapBBox struct {
 }
 
 type Node struct {
-	Id NodeId
-	X XCoord
-	Y YCoord
-	Edges []Edge
+	Id           NodeId
+	X            XCoord
+	Y            YCoord
+	Edges        []Edge
+	IsEntrypoint RoadCluster
+	IsExitpoint  RoadCluster
+
 	//NodesFrom []*Node // TODO - to raczej sie nie przyda ale do jakies optymalizacji moze sie przyda
 }
 
 type Edge struct {
 	// TODO - w przyszlosci wynik dzialania IM: latency, delay
-	To *Node
-	Distance Meter
-	IsArc bool
-	IsInternal bool
+	To         *Node
+	Distance   Meter
+	IsArc      bool
 }
 
 type IntersectionManager struct {

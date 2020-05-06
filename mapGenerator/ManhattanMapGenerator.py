@@ -2,8 +2,8 @@ import math
 
 
 class Config:
-    LANE_WIDTH = 3 # [meters]
-    GRID_SIZE = 50 # co 100 metrów skrzyżowanie
+    INTERSECTION_APPROACH_LENGTH = 20  # [meters]
+    LANE_WIDTH = 3  # [meters]
 
 # Układ odniesienia:
 #
@@ -14,14 +14,17 @@ class Config:
 
 class ManhattanMapGenerator:
 
-    def __init__(self, map_width, map_height):
-        self.map_width = map_width
-        self.map_height = map_height
+    def __init__(self):
+        size = Config.INTERSECTION_APPROACH_LENGTH * 2 + 2 * Config.LANE_WIDTH
+        self.map_width = size
+        self.map_height = size
+        self.intersection_center = {"x": size / 2, "y": size / 2}
 
         self.node_seq = 0
 
     def generate(self):
         unique_ids = {}
+
         def generate_id(*ns):
             for node in ns:
                 node["id"] = (node["x"], node["y"])
@@ -34,53 +37,6 @@ class ManhattanMapGenerator:
                 "from": node_from["id"],
                 "to": node_to["id"],
                 "arc": True,
-            })
-
-        def connect_up(node):
-            is_uppermost_node = node["y"] == TOP_LANE_Y
-
-            if is_uppermost_node:
-                neighbour = (node["x"], self.map_height)
-            else:
-                neighbour = (node["x"], node["y"] + Config.GRID_SIZE - Config.LANE_WIDTH * 2)
-            edges.append({
-                "from": node["id"],
-                "to": neighbour
-            })
-
-        def connect_down(node):
-            is_downmost_interesction_node = node["y"] == BOTTOM_LANE_Y
-            if is_downmost_interesction_node:
-                neighbour = (node["x"], 0)
-            else:
-                neighbour = (node["x"], node["y"] - Config.GRID_SIZE + Config.LANE_WIDTH * 2)
-
-            edges.append({
-                "from": node["id"],
-                "to": neighbour
-            })
-
-        def connect_left(node):
-            is_leftmost_node = node["x"] == LEFT_LANE_X
-            if is_leftmost_node:
-                neighbour = (0, node["y"])
-            else:
-                neighbour = (node["x"] - Config.GRID_SIZE + Config.LANE_WIDTH * 2, node["y"])
-            edges.append({
-                "from": node["id"],
-                "to": neighbour
-            })
-
-        def connect_right(node):
-            is_rightmost_node = node["x"] == RIGHT_LANE_X
-            if is_rightmost_node:
-                neighbour = (self.map_width, node["y"])
-
-            else:
-                neighbour = (node["x"] + Config.GRID_SIZE - Config.LANE_WIDTH * 2, node["y"])
-            edges.append({
-                "from": node["id"],
-                "to": neighbour
             })
 
         def generate_arc(node_from, node_to, radius, turn_dir, quarter):
@@ -192,145 +148,22 @@ class ManhattanMapGenerator:
                     "arc": True,
                 })
 
-        def add_internal_roads():
-            nonlocal edges
-            nonlocal nodes
-            new_edges = []
-            for e in edges:
-                if "arc" in e and e["arc"]:
-                    new_edges.append(e)
-                    continue
-
-                x_from = e["from"][0]
-                y_from = e["from"][1]
-                x_to = e["to"][0]
-                y_to = e["to"][1]
-
-                if x_from != x_to:
-                    new_edges.append(e)
-                    continue
-
-                if y_from >= y_to:
-                    new_edges.append(e)
-                    continue
-
-                if y_to - y_from <= Config.GRID_SIZE/ 2:
-                    new_edges.append(e)
-                    continue
-
-                n1 = {
-                    "x": x_from,
-                    "y": y_from + Config.GRID_SIZE / 4 - Config.LANE_WIDTH / 2,
-                }
-                n2 = {
-                    "x": n1["x"] + Config.LANE_WIDTH / 2,
-                    "y": n1["y"] + Config.LANE_WIDTH / 2
-                }
-                n3 = {
-                    "x": n2["x"] + Config.GRID_SIZE / 4,
-                    "y": n2["y"],
-                }
-                n4 = {
-                    "x": n3["x"],
-                    "y": n3["y"] + Config.GRID_SIZE / 2 - Config.LANE_WIDTH / 2,
-                }
-                n5 = {
-                    "x": n4["x"] - Config.GRID_SIZE / 4,
-                    "y": n4["y"],
-                }
-                n6 = {
-                    "x": n5["x"] - Config.LANE_WIDTH / 2,
-                    "y": n5["y"] + Config.LANE_WIDTH / 2,
-                }
-
-                generate_id(n1)
-                nodes.append(n1)
-                new_edges.append({
-                    "from": e["from"],
-                    "to": n1["id"],
-                })
-
-                generate_id(n2)
-                nodes.append(n2)
-                generate_arc(n1, n2, Config.LANE_WIDTH / 2, "right", 1)
-
-                generate_id(n3)
-                nodes.append(n3)
-                new_edges.append({
-                    "from": n2["id"],
-                    "to": n3["id"],
-                })
-
-                generate_id(n4)
-                nodes.append(n4)
-                new_edges.append({
-                    "from": n3["id"],
-                    "to": n4["id"],
-                    "internal": True,
-                })
-
-                generate_id(n5)
-                nodes.append(n5)
-                new_edges.append({
-                    "from": n4["id"],
-                    "to": n5["id"],
-                })
-
-                generate_id(n6)
-                nodes.append(n6)
-                generate_arc(n5, n6, Config.LANE_WIDTH / 2, "right", 4)
-
-                new_edges.append({
-                    "from": n1["id"],
-                    "to": n6["id"],
-                })
-
-                new_edges.append({
-                    "from": n6["id"],
-                    "to": e["to"],
-                })
-
-
-            return new_edges, nodes
-
-
         nodes = []
         edges = []
 
-        grids_x = self.map_width // Config.GRID_SIZE # floor division
-        grids_y = self.map_height // Config.GRID_SIZE # floor division
+        n1_a = {"x": 0, "y": self.intersection_center["y"] - Config.LANE_WIDTH / 2, "entrypoint": 1}
+        n2_a = {"x": 0, "y": self.intersection_center["y"] + Config.LANE_WIDTH / 2, "exitpoint": 1}
+        n3_a = {"x": self.map_width, "y": self.intersection_center["y"] - Config.LANE_WIDTH / 2, "exitpoint": 2}
+        n4_a = {"x": self.map_width, "y": self.intersection_center["y"] + Config.LANE_WIDTH / 2, "entrypoint": 2}
+        generate_id(n1_a, n2_a, n3_a, n4_a)
+        nodes = nodes + [n1_a, n2_a, n3_a, n4_a]
 
-        offset_x = (self.map_width - (grids_x * Config.GRID_SIZE)) / 2
-        offset_y = (self.map_height - (grids_y * Config.GRID_SIZE)) / 2
-
-        intersections = []
-        for x in range(0, grids_x + 1):
-            for y in range(0, grids_y + 1):
-                intersections.append({
-                    "x": offset_x + x * Config.GRID_SIZE,
-                    "y": offset_y + y * Config.GRID_SIZE,
-                })
-
-        for y in range(0, self.map_height, Config.GRID_SIZE):
-            n1 = {"x": 0, "y": y + offset_y - Config.LANE_WIDTH / 2}
-            n2 = {"x": 0, "y": y + offset_y + Config.LANE_WIDTH / 2}
-            n3 = {"x": self.map_width, "y": y + offset_y - Config.LANE_WIDTH / 2}
-            n4 = {"x": self.map_width, "y": y + offset_y + Config.LANE_WIDTH / 2}
-            generate_id(n1, n2, n3, n4)
-            nodes = nodes + [n1, n2, n3, n4]
-
-        for x in range(0, self.map_width, Config.GRID_SIZE):
-            n1 = {"x": x + offset_x - Config.LANE_WIDTH / 2, "y": 0}
-            n2 = {"x": x + offset_x + Config.LANE_WIDTH / 2, "y": 0}
-            n3 = {"x": x + offset_x - Config.LANE_WIDTH / 2, "y": self.map_height}
-            n4 = {"x": x + offset_x + Config.LANE_WIDTH / 2, "y": self.map_height}
-            generate_id(n1, n2, n3, n4)
-            nodes = nodes + [n1, n2, n3, n4]
-
-        LEFT_LANE_X = offset_x - Config.LANE_WIDTH
-        RIGHT_LANE_X = self.map_width - offset_x + Config.LANE_WIDTH
-        TOP_LANE_Y = self.map_height - offset_y + Config.LANE_WIDTH
-        BOTTOM_LANE_Y = offset_y - Config.LANE_WIDTH
+        n1 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH / 2, "y": 0, "exitpoint": 3}
+        n2 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH / 2, "y": 0, "entrypoint": 3}
+        n3 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH / 2, "y": self.map_height, "entrypoint": 4}
+        n4 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH / 2, "y": self.map_height, "exitpoint": 4}
+        generate_id(n1, n2, n3, n4)
+        nodes = nodes + [n1, n2, n3, n4]
 
         #      |   |
         #      n1  n2
@@ -341,58 +174,62 @@ class ManhattanMapGenerator:
         #
         #      n6  n5
         #       |   |
-        for i in intersections:
-            n_1 = {"x": i["x"] - Config.LANE_WIDTH / 2, "y": i["y"] + Config.LANE_WIDTH    }
-            n_2 = {"x": i["x"] + Config.LANE_WIDTH / 2, "y": i["y"] + Config.LANE_WIDTH    }
-            n_3 = {"x": i["x"] + Config.LANE_WIDTH    , "y": i["y"] + Config.LANE_WIDTH / 2}
-            n_4 = {"x": i["x"] + Config.LANE_WIDTH    , "y": i["y"] - Config.LANE_WIDTH / 2}
-            n_5 = {"x": i["x"] + Config.LANE_WIDTH / 2, "y": i["y"] - Config.LANE_WIDTH    }
-            n_6 = {"x": i["x"] - Config.LANE_WIDTH / 2, "y": i["y"] - Config.LANE_WIDTH    }
-            n_7 = {"x": i["x"] - Config.LANE_WIDTH    , "y": i["y"] - Config.LANE_WIDTH / 2}
-            n_8 = {"x": i["x"] - Config.LANE_WIDTH    , "y": i["y"] + Config.LANE_WIDTH / 2}
-            generate_id(n_1, n_2, n_3, n_4, n_5, n_6, n_7, n_8)
-            nodes = nodes + [n_1, n_2, n_3, n_4, n_5, n_6, n_7, n_8]
+        n_1 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH / 2, "y": self.intersection_center["y"] + Config.LANE_WIDTH    }
+        n_2 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH / 2, "y": self.intersection_center["y"] + Config.LANE_WIDTH    }
+        n_3 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH    , "y": self.intersection_center["y"] + Config.LANE_WIDTH / 2}
+        n_4 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH    , "y": self.intersection_center["y"] - Config.LANE_WIDTH / 2}
+        n_5 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH / 2, "y": self.intersection_center["y"] - Config.LANE_WIDTH    }
+        n_6 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH / 2, "y": self.intersection_center["y"] - Config.LANE_WIDTH    }
+        n_7 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH    , "y": self.intersection_center["y"] - Config.LANE_WIDTH / 2}
+        n_8 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH    , "y": self.intersection_center["y"] + Config.LANE_WIDTH / 2}
+        generate_id(n_1, n_2, n_3, n_4, n_5, n_6, n_7, n_8)
+        nodes = nodes + [n_1, n_2, n_3, n_4, n_5, n_6, n_7, n_8]
 
-            connect_up(n_2)
-            connect_down(n_6)
-            connect_left(n_8)
-            connect_right(n_4)
+        generate_arc(n_3, n_2, Config.LANE_WIDTH / 2, "right", 4)
+        generate_arc(n_3, n_6, Config.LANE_WIDTH * 1.5, "left", 1)
+        add_edge_arc(n_3, n_8)
+        generate_arc(n_5, n_4, Config.LANE_WIDTH / 2, "right", 1)
+        generate_arc(n_5, n_8, Config.LANE_WIDTH * 1.5, "left", 2)
+        add_edge_arc(n_5, n_2)
+        generate_arc(n_7, n_6, Config.LANE_WIDTH / 2, "right", 2)
+        generate_arc(n_7, n_2, Config.LANE_WIDTH * 1.5, "left", 3)
+        add_edge_arc(n_7, n_4)
+        generate_arc(n_1, n_8, Config.LANE_WIDTH / 2, "right", 3)
+        generate_arc(n_1, n_4, Config.LANE_WIDTH * 1.5, "left", 4)
+        add_edge_arc(n_1, n_6)
 
-            generate_arc(n_3, n_2, Config.LANE_WIDTH / 2, "right", 4)
-            generate_arc(n_3, n_6, Config.LANE_WIDTH * 1.5, "left", 1)
-            add_edge_arc(n_3, n_8)
-            generate_arc(n_5, n_4, Config.LANE_WIDTH / 2, "right", 1)
-            generate_arc(n_5, n_8, Config.LANE_WIDTH * 1.5, "left", 2)
-            add_edge_arc(n_5, n_2)
-            generate_arc(n_7, n_6, Config.LANE_WIDTH / 2, "right", 2)
-            generate_arc(n_7, n_2, Config.LANE_WIDTH * 1.5, "left", 3)
-            add_edge_arc(n_7, n_4)
-            generate_arc(n_1, n_8, Config.LANE_WIDTH / 2, "right", 3)
-            generate_arc(n_1, n_4, Config.LANE_WIDTH * 1.5, "left", 4)
-            add_edge_arc(n_1, n_6)
-
-            if n_7["x"] == LEFT_LANE_X:
-                edges.append({
-                    "from": (0, n_7["y"]),
-                    "to": n_7["id"],
-                })
-            if n_3["x"] == RIGHT_LANE_X:
-                edges.append({
-                    "from": (self.map_width, n_3["y"]),
-                    "to": n_3["id"],
-                })
-            if n_1["y"] == TOP_LANE_Y:
-                edges.append({
-                    "from":(n_1["x"], self.map_height),
-                    "to":  n_1["id"],
-                })
-            if n_5["y"] == BOTTOM_LANE_Y:
-                edges.append({
-                    "from": (n_5["x"], 0),
-                    "to": n_5["id"],
-                })
-
-        edges, nodes = add_internal_roads()
+        edges.append({
+            "from": (0, n_7["y"]),
+            "to": n_7["id"],
+        })
+        edges.append({
+            "from": n_8["id"],
+            "to": (0, n_8["y"]),
+        })
+        edges.append({
+            "from": (self.map_width, n_3["y"]),
+            "to": n_3["id"],
+        })
+        edges.append({
+            "from": n_4["id"],
+            "to":  (self.map_width, n_4["y"]),
+        })
+        edges.append({
+            "from":(n_1["x"], self.map_height),
+            "to":  n_1["id"],
+        })
+        edges.append({
+            "from": n_2["id"],
+            "to":  (n_2["x"], self.map_height),
+        })
+        edges.append({
+            "from": (n_5["x"], 0),
+            "to": n_5["id"],
+        })
+        edges.append({
+            "from": n_6["id"],
+            "to": (n_6["x"], 0),
+        })
 
         self.fix_nodes_ids(nodes, edges)
 
