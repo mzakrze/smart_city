@@ -6,6 +6,13 @@ class TripIndexFacade {
 
     async getVehicleIdToSizeMap() {
 
+        let res = {}
+        for (let i = 0; i < 100; i++) {
+            res[i + ""] = {width: 2, length: 4}
+        }
+
+        return res
+
         let vehicleIdToSize = {}
 
         // TODO - wykrywać czy jest więcej niż limit

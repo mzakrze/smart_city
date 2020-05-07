@@ -11,7 +11,7 @@ import (
 
 type FluentVehicleCurrentLocation struct {
 	VehicleId types.VehicleId
-	Timestamp types.Timestamp
+	Timestamp types.Milisecond
 	Lat       types.Latitude
 	Lon       types.Longitude
 	Alpha     float64
@@ -22,15 +22,15 @@ type FluentVehicleCurrentLocation struct {
 
 type FluentVehicleBucketLocation struct {
 	VehicleId types.VehicleId
-	StartSecond types.Timestamp
+	StartSecond types.Milisecond
 	Location []types.LocationStruct
 	Alpha []float64
 }
 
 type FluentVehicleTrip struct {
 	VehicleId types.VehicleId
-	StartTs types.Timestamp
-	EndTs types.Timestamp
+	StartTs types.Milisecond
+	EndTs types.Milisecond
 	Width types.Meter
 	Length types.Meter
 	//OriginLat float64
@@ -58,7 +58,7 @@ type VehicleLocationReport struct {
 	// aktualnie wysylanie 1 raz na sekunde
 	alpha       [STEPS_IN_SECOND]float64
 	step        int
-	startSecond int64
+	startSecond types.Milisecond
 	isEmpty bool // TODO - przepisac to
 }
 
@@ -146,21 +146,21 @@ func (f *FluentLogger) doSend(tag string, msg map[string]string) {
 	}
 }
 
-func (f *FluentLogger) ReportVehicle(ts types.Timestamp, controller *VehicleController) {
+func (f *FluentLogger) ReportVehicle(ts types.Milisecond, controller *VehicleController) {
 	if controller.VehicleState == types.VEHICLE_NOT_STARTED {
 		return
 	}
-	if f.tripReportSent[controller.vehicleId] {
+	if f.tripReportSent[controller.VehicleId] {
 		return
 	}
 
-	if controller.VehicleState == types.VEHICLE_FINISHED && f.tripReportSent[controller.vehicleId] == false {
+	if controller.VehicleState == types.VEHICLE_FINISHED && f.tripReportSent[controller.VehicleId] == false {
 		data := &FluentVehicleTrip{
-			VehicleId: controller.vehicleId,
+			VehicleId: controller.VehicleId,
 			StartTs: controller.startTs,
 			EndTs: controller.endTs,
-			Width: controller.vehicleActor.Width,
-			Length: controller.vehicleActor.Length,
+			Width: controller.VehicleActor.Width,
+			Length: controller.VehicleActor.Length,
 			//OriginLat: v.originLat,
 			//OriginLon: v.originLon,
 			//DestinationLat: v.destinationLat,
@@ -168,7 +168,7 @@ func (f *FluentLogger) ReportVehicle(ts types.Timestamp, controller *VehicleCont
 		}
 
 		f.VehicleTrip(data)
-		f.tripReportSent[controller.vehicleId] = true
+		f.tripReportSent[controller.VehicleId] = true
 	} else {
 		f.reportCurrentLocation(controller, ts)
 		f.appendLocationToBucket(controller, ts)
@@ -178,24 +178,24 @@ func (f *FluentLogger) ReportVehicle(ts types.Timestamp, controller *VehicleCont
 }
 
 
-func (f *FluentLogger) reportCurrentLocation(v* VehicleController, ts types.Timestamp) {
+func (f *FluentLogger) reportCurrentLocation(v* VehicleController, ts types.Milisecond) {
 	data := &FluentVehicleCurrentLocation{
-		VehicleId: v.vehicleId,
+		VehicleId: v.VehicleId,
 		Timestamp: ts,
-		Lat: f.yToLat(v.vehicleActor.Y),
-		Lon: f.xToLon(v.vehicleActor.X),
-		Speed: v.vehicleActor.Speed_mps,
+		Lat: f.yToLat(v.VehicleActor.Y),
+		Lon: f.xToLon(v.VehicleActor.X),
+		Speed: v.VehicleActor.Speed_mps,
 	}
 	f.VehicleCurrentLocation(data)
 }
 
 
-func (f *FluentLogger) flushBucketIfFull(v *VehicleController, ts int64) {
-	locationReport := f.locationReport[v.vehicleId]
+func (f *FluentLogger) flushBucketIfFull(v *VehicleController, ts types.Milisecond) {
+	locationReport := f.locationReport[v.VehicleId]
 	if locationReport.step == cap(locationReport.location) {
 
 		data := &FluentVehicleBucketLocation{
-			VehicleId: v.vehicleId,
+			VehicleId: v.VehicleId,
 			StartSecond:locationReport.startSecond,
 			Location: locationReport.location[:],
 			Alpha: locationReport.alpha[:],
@@ -208,15 +208,15 @@ func (f *FluentLogger) flushBucketIfFull(v *VehicleController, ts int64) {
 	}
 }
 
-	func (f *FluentLogger) appendLocationToBucket(v* VehicleController, ts types.Timestamp) {
-	locationReport := f.locationReport[v.vehicleId]
+	func (f *FluentLogger) appendLocationToBucket(v* VehicleController, ts types.Milisecond) {
+	locationReport := f.locationReport[v.VehicleId]
 	if locationReport == nil {
 		locationReport = &VehicleLocationReport{
 			location: [STEPS_IN_SECOND]types.LocationStruct{},
 			alpha: [STEPS_IN_SECOND]float64{},
 			isEmpty: true,
 		}
-		f.locationReport[v.vehicleId] = locationReport
+		f.locationReport[v.VehicleId] = locationReport
 	}
 	if locationReport.isEmpty {
 		locationReport.startSecond = ts / 1000
@@ -225,15 +225,15 @@ func (f *FluentLogger) flushBucketIfFull(v *VehicleController, ts int64) {
 	}
 
 	locationReport.location[locationReport.step] = types.LocationStruct{
-		Lat: f.yToLat(v.vehicleActor.Y),
-		Lon: f.xToLon(v.vehicleActor.X),
+		Lat: f.yToLat(v.VehicleActor.Y),
+		Lon: f.xToLon(v.VehicleActor.X),
 	}
-	locationReport.alpha[locationReport.step] = v.vehicleActor.Alpha
+	locationReport.alpha[locationReport.step] = v.VehicleActor.Alpha
 	locationReport.step += 1
 }
 
-func (f *FluentLogger) flushAllReports(ts int64) {
-	//locationReport := f.locationReport[v.vehicleId]
+func (f *FluentLogger) flushAllReports(ts types.Milisecond) {
+	//locationReport := f.locationReport[v.VehicleId]
 	for vehicleId, locationReport := range f.locationReport {
 		if locationReport.isEmpty == false {
 			data := &FluentVehicleBucketLocation{

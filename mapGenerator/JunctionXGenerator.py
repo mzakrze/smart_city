@@ -2,7 +2,7 @@ import math
 
 
 class Config:
-    INTERSECTION_APPROACH_LENGTH = 20  # [meters]
+    INTERSECTION_APPROACH_LENGTH = 50  # [meters]
     LANE_WIDTH = 3  # [meters]
 
 # Układ odniesienia:
@@ -12,7 +12,7 @@ class Config:
 # (0,0)             ....,    (map_width, 0)
 
 
-class ManhattanMapGenerator:
+class JunctionXGenerator:
 
     def __init__(self):
         size = Config.INTERSECTION_APPROACH_LENGTH * 2 + 2 * Config.LANE_WIDTH
@@ -233,9 +233,23 @@ class ManhattanMapGenerator:
 
         self.fix_nodes_ids(nodes, edges)
 
+# TODO - ruszyć stąd: obszar jurysdykcji IM
+        # potem - komunikaty v<->im: REQ, GRANT, DENY (narazie 100% komunikatów i 0 latency)
+        # potem - mock ip_sequential: tylko DENY, i potem pojazdy słucha się IM i jak nie ma granta to nie wjeżdzą
+        # potem - napisać PID'a aby samochód się zatrzymywał przed wjazdem na skrzyżowanie
+        # potem - IM taki, że wpuszcza 1 na raz
+        # potem - IM FCFS
+        intersection_manager = {
+            "bboxUp": self.intersection_center["y"] + Config.LANE_WIDTH,
+            "bboxDown": self.intersection_center["y"] - Config.LANE_WIDTH,
+            "bboxLeft": self.intersection_center["x"] - Config.LANE_WIDTH,
+            "bboxRight": self.intersection_center["x"] + Config.LANE_WIDTH,
+        }
+
         return {
             "nodes": nodes,
-            "edges": edges
+            "edges": edges,
+            "im": intersection_manager,
         }
 
     def fix_nodes_ids(self, nodes, edges):

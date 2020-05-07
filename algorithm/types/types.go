@@ -11,8 +11,7 @@ type VehicleId = int32
 type ImID = int32
 
 type Meter = float64
-
-type Timestamp = int64
+type Milisecond = int
 
 type VehicleState = int
 
@@ -40,8 +39,8 @@ type LocationStruct struct {
 
 type Graph struct {
 	AllNodes []Node // FIXME - zamienic na slownik id->Node
-	IntersectionManagers []IntersectionManager
 	MapBBox MapBBox
+	IntersectionManager IntersectionManager
 
 	//StartNodes []*Node // TODO - narazie raczej nie potrzebne
 	//EndNodes []*Node
@@ -63,8 +62,6 @@ type Node struct {
 	Edges        []Edge
 	IsEntrypoint RoadCluster
 	IsExitpoint  RoadCluster
-
-	//NodesFrom []*Node // TODO - to raczej sie nie przyda ale do jakies optymalizacji moze sie przyda
 }
 
 type Edge struct {
@@ -75,9 +72,11 @@ type Edge struct {
 }
 
 type IntersectionManager struct {
-	Id ImID
-	X XCoord
-	Y YCoord
+	// Intersection Manager's jurisdiction area
+	BboxUp Meter
+	BboxDown Meter
+	BboxLeft Meter
+	BboxRight Meter
 }
 
 

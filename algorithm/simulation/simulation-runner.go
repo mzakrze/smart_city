@@ -13,58 +13,46 @@ const (
 
 	STEP_INTERVAL_MS = 100
 	SIMULATION_START_LAYOUT 	= "2020-01-01T20:00:00.000Z"
-	SIMULATION_END_LAYOUT 		= "2020-01-01T21:00:00.000Z"
+	SIMULATION_END_LAYOUT 		= "2020-01-01T20:01:00.000Z"
 
-	VEHICLES_NO = 50
-
-	// 
+	//
 	STEPS_IN_SECOND = 1000 / STEP_INTERVAL_MS
 )
 
 type SimulationRunner struct {
-	simulationStart int64
-	simulationEnd int64
+	simulationStart types.Milisecond
+	simulationEnd   types.Milisecond
+	nextVehicleId 	types.VehicleId
 
-	logger *FluentLogger
-	RoadsGraph *types.Graph
-	vehiclesControllers [VEHICLES_NO]VehicleController
+	logger              *FluentLogger
+	vehicleAheadSensor  *algorithm.VehicleAheadSensor
+	RoadsGraph          *types.Graph
+	VehiclesControllers []*VehicleController
+	entrypoints         []types.DestinationPoint // TODO - różne typy, bo sie kiedyś pomiesza in z out
+	exitpoints          []types.DestinationPoint
 }
 
 func CreateSimulationRunner() *SimulationRunner {
 	validateSettings()
 
 	roadsGraph := util.ReadGraph()
+	entrypoints, exitpoints := parseRoadsGraph(roadsGraph)
 
-	instance := SimulationRunner{RoadsGraph: roadsGraph}
+	instance := SimulationRunner{RoadsGraph: roadsGraph, entrypoints: entrypoints, exitpoints: exitpoints}
+	instance.vehicleAheadSensor = &algorithm.VehicleAheadSensor{AllVehicles: []*algorithm.VehicleActor{}}
 
 	instance.initStartEnd()
 
-	instance.initVehicleControllers()
 
 	instance.initFluentdLogger()
 
 	return &instance
 }
 
-func (r *SimulationRunner) initStartEnd() {
-	start, err := time.Parse(time.RFC3339, SIMULATION_START_LAYOUT)
-	if err != nil { panic(err) }
-	end, err := time.Parse(time.RFC3339, SIMULATION_END_LAYOUT)
-	if err != nil { panic(err) }
-	const nanoToMs int64 = 10e6
-	const hackFIXME int64 = 10 // TODO - pobieram nanosekundy, zamieniam na ms, a bazie jest 10 razy za mała wartość. Pewnie na innej warstwie sie psuje, ale taki hack na szybko
-
-	r.simulationStart = int64(start.UnixNano() / nanoToMs) * hackFIXME
-	r.simulationEnd = int64(end.UnixNano() / nanoToMs) * hackFIXME
-}
-
-func (r *SimulationRunner) initVehicleControllers() {
-
-	rand.Seed(time.Now().Unix())
-
+func parseRoadsGraph(graph *types.Graph) ([]types.DestinationPoint, []types.DestinationPoint) {
 	entrypoints := []types.DestinationPoint{}
 	exitpoints := []types.DestinationPoint{}
-	for _, n := range r.RoadsGraph.AllNodes {
+	for _, n := range graph.AllNodes {
 		if n.IsEntrypoint != 0 {
 			// z kazdego entrypointu zawsze dokladnie 1 edge
 			nodeTo := n.Edges[0].To
@@ -95,34 +83,19 @@ func (r *SimulationRunner) initVehicleControllers() {
 		}
 	}
 
-	getRandomWithDifferentCluster := func (points []types.DestinationPoint, cluster types.RoadCluster) types.DestinationPoint {
-		maxTries := 100
-		for i := 0; i < maxTries; i++ {
-			r := points[rand.Intn(len(points))]
-			if r.Cluster != cluster {
-				return  r
-			}
-		}
-		panic("Fail after 100 tries")
-	}
+	return entrypoints, exitpoints
+}
 
-	for vehicleId := 0; vehicleId < VEHICLES_NO; vehicleId += 1 {
-		origin := entrypoints[rand.Intn(len(entrypoints))]
-		destination := getRandomWithDifferentCluster(exitpoints, origin.Cluster)
+func (r *SimulationRunner) initStartEnd() {
+	start, err := time.Parse(time.RFC3339, SIMULATION_START_LAYOUT)
+	if err != nil { panic(err) }
+	end, err := time.Parse(time.RFC3339, SIMULATION_END_LAYOUT)
+	if err != nil { panic(err) }
+	const nanoToMs int64 = 10e6
+	const hackFIXME int = 10 // TODO - pobieram nanosekundy, zamieniam na ms, a bazie jest 10 razy za mała wartość. Pewnie na innej warstwie sie psuje, ale taki hack na szybko
 
-		startTs	:= r.simulationStart // TODO losować
-
-		vehicleController := VehicleController{
-			vehicleId: int32(vehicleId),
-			VehicleState: types.VEHICLE_NOT_STARTED,
-			startTs: startTs,
-			origin: origin,
-			destination: destination,
-			RoadsGraph: r.RoadsGraph,
-		}
-
-		r.vehiclesControllers[vehicleId] = vehicleController
-	} 
+	r.simulationStart = int(start.UnixNano() / nanoToMs) * hackFIXME
+	r.simulationEnd = int(end.UnixNano() / nanoToMs) * hackFIXME
 }
 
 func (r *SimulationRunner) initFluentdLogger() {
@@ -152,35 +125,32 @@ func (r *SimulationRunner) initFluentdLogger() {
 }
 
 type VehicleController struct {
-	vehicleId types.VehicleId
-	vehicleActor *algorithm.VehicleActor
+	VehicleId    types.VehicleId
+	VehicleActor *algorithm.VehicleActor
 
 	VehicleState types.VehicleState
 
-	startTs int64
-	endTs int64
+	startTs types.Milisecond
+	endTs   types.Milisecond
 
-	origin types.DestinationPoint
-	destination types.DestinationPoint
-	RoadsGraph *types.Graph
+	origin           types.DestinationPoint
+	destination      types.DestinationPoint
+	RoadsGraph       *types.Graph
+	simulationRunner *SimulationRunner
 }
 
 
-func (v* VehicleController) ping(ts types.Timestamp) {
+func (v* VehicleController) ping(ts types.Milisecond) {
 	switch v.VehicleState {
 	case types.VEHICLE_FINISHED:
 		// do nothing
 	case types.VEHICLE_DRIVING:
-		v.vehicleActor.Ping(ts)
-		if v.vehicleActor.HasFinished {
+		v.VehicleActor.Ping(ts)
+		if v.VehicleActor.HasFinished {
 			v.VehicleState = types.VEHICLE_FINISHED
 		}
 	case types.VEHICLE_NOT_STARTED:
-		if v.startTs >= ts {
-			// initiate vehicleActor
-			v.vehicleActor = algorithm.InitVehicleActor(v.origin, v.destination, v.RoadsGraph)
-			v.VehicleState = types.VEHICLE_DRIVING
-		}
+		// TODO
 	}
 }
 
@@ -195,24 +165,24 @@ func validateSettings() {
 	// TODO - czy min/max lat/lon ma sens
 }
 
-func (r *SimulationRunner) haveAllVehiclesFinished() bool {
-	for _, v := range r.vehiclesControllers {
-		if v.VehicleState != types.VEHICLE_FINISHED {
-			return false
-		}
-	}
-	return true
-}
 
 func (r *SimulationRunner) RunSimulation() {
 
-	// TODO - coś do śledzenia progresu, np: https://github.com/machinebox/progress
-	ts := r.simulationStart
-	for ; ts <= r.simulationEnd || ! r.haveAllVehiclesFinished(); ts += STEP_INTERVAL_MS {
+	//rand.Seed(time.Now().Unix())
 
-		for i := 0; i < len(r.vehiclesControllers); i++ {
-			r.vehiclesControllers[i].ping(ts)
-			r.logger.ReportVehicle(ts, &r.vehiclesControllers[i])
+	rand.Seed(1237)
+	// TODO - coś do śledzenia progresu, np: https://github.com/machinebox/progress
+
+	const simulationTimeMs types.Milisecond = 60 * 1000
+	for ts := 0; ts <= simulationTimeMs; ts += STEP_INTERVAL_MS {
+
+		if ts % 3000 == 0 {
+			r.updateVehicleControllers(ts)
+		}
+
+		for i := 0; i < len(r.VehiclesControllers); i++ {
+			r.VehiclesControllers[i].ping(ts)
+			r.logger.ReportVehicle(ts, r.VehiclesControllers[i])
 		}
 
 	}
@@ -220,3 +190,54 @@ func (r *SimulationRunner) RunSimulation() {
 	fmt.Println("Done.")
 }
 
+func (r *SimulationRunner) updateVehicleControllers(ts types.Milisecond) {
+
+	const VEHICLES_NO = 8
+
+	// 1. usun tych którzy dojechali (i wyślij do ES)
+	// FIXME - not implemented
+
+	// 2. dodaj jakiś jeśli jest miejsce
+	//for v := len(r.VehiclesControllers); v < VEHICLES_NO; v++ {
+		// TODO - narazie zakładam, że to nie bedzie problem, ale sprawdzac czy pojazd ma szanse się zmieścic na lini (wyhamować itp.)
+		newVehicle := r.generateNewVehicleController(ts)
+		// FIXME - wykrywać czy wygenerowany pojazd ma w ogóle szanse wyhamować (jeśli nie - generować gdzie indziej)
+		r.VehiclesControllers = append(r.VehiclesControllers, newVehicle)
+
+		// TODO - to jest troche krzywe, bo trzeba o tym pamiętać
+		r.vehicleAheadSensor.AllVehicles = append(r.vehicleAheadSensor.AllVehicles, newVehicle.VehicleActor)
+	//}
+
+}
+func (r *SimulationRunner) generateNewVehicleController(ts types.Milisecond) *VehicleController {
+	getRandomWithDifferentCluster := func (points []types.DestinationPoint, cluster types.RoadCluster) types.DestinationPoint {
+		maxTries := 100
+		for i := 0; i < maxTries; i++ {
+			r := points[rand.Intn(len(points))]
+			if r.Cluster != cluster {
+				return  r
+			}
+		}
+		panic("Fail after 100 tries")
+	}
+
+	origin := r.entrypoints[rand.Intn(len(r.entrypoints))]
+	destination := getRandomWithDifferentCluster(r.exitpoints, origin.Cluster)
+
+	id := r.nextVehicleId
+	r.nextVehicleId += 1
+
+	actor := algorithm.InitVehicleActor(id, origin, destination, ts, r.RoadsGraph, r.vehicleAheadSensor)
+	vehicleController := VehicleController{
+		VehicleId:        id,
+		VehicleState:     types.VEHICLE_DRIVING,
+		startTs:          ts,
+		origin:           origin,
+		destination:      destination,
+		RoadsGraph:       r.RoadsGraph,
+		simulationRunner: r,
+		VehicleActor:	  actor,
+	}
+
+	return &vehicleController
+}

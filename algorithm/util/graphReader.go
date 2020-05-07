@@ -32,17 +32,16 @@ type edge struct {
 	Arc bool
 }
 
-
 func ReadGraph() *types.Graph {
 
 	nodesRaw := readNodesRaw(NODES_FILE)
 	edgesRaw := readEdgesRaw(EDGES_FILE)
-	graphBBox := readGraphBBoxRaw(GRAPH_BBOX_FILE)
+	graphBBox, im := readGraphMeta(GRAPH_BBOX_FILE)
 
-	return assembleGraph(nodesRaw, edgesRaw, graphBBox)
+	return assembleGraph(nodesRaw, edgesRaw, graphBBox, im)
 }
 
-func assembleGraph(nodesRaw []node, edgesRaw []edge, mapBox types.MapBBox)  *types.Graph {
+func assembleGraph(nodesRaw []node, edgesRaw []edge, mapBox types.MapBBox, im types.IntersectionManager)  *types.Graph {
 
 	nodesMap := make(map[types.NodeId]*types.Node)
 	nodes := make([]types.Node, len(nodesRaw))
@@ -78,7 +77,7 @@ func assembleGraph(nodesRaw []node, edgesRaw []edge, mapBox types.MapBBox)  *typ
 	return &types.Graph{
 		MapBBox: mapBox,
 		AllNodes: nodes,
-		IntersectionManagers: make([]types.IntersectionManager, 0), // FIXME - python musi generować IM + i dodac w Go czytanie
+		IntersectionManager: im,
 	}
 }
 
@@ -126,8 +125,13 @@ func readEdgesRaw(filepath string) []edge {
 	return edges
 }
 
-func readGraphBBoxRaw(filepath string) types.MapBBox {
-	result := types.MapBBox{}
+func readGraphMeta(filepath string) (types.MapBBox, types.IntersectionManager) {
+
+	type graphMeta struct {
+		Graph types.MapBBox
+		Im types.IntersectionManager
+	}
+	result := graphMeta{}
 
 	readFile, err := os.Open(filepath)
 
@@ -139,12 +143,11 @@ func readGraphBBoxRaw(filepath string) types.MapBBox {
 	fileScanner.Split(bufio.ScanLines)
 
 	// tu i tak spodziewamy sie jednej linijki
-	for i := 0; fileScanner.Scan() ; i++ { // FIXME - warning tutaj
-		err := json.Unmarshal([]byte(fileScanner.Text()), &result)
-		if err != nil { panic(err) }
-		if result.Width == 0 { panic("Error reading bbox - empty Width, line: " + fileScanner.Text()) }
-		return result
-	}
+	fileScanner.Scan()
+	text := fileScanner.Text()
+	err = json.Unmarshal([]byte(text), &result)
+	if err != nil { panic(err) }
+	if result.Graph.Width == 0 { panic("Error reading bbox - empty Width, line: " + fileScanner.Text()) }
 
-	panic("Could not read Graph Bbox")
+	return result.Graph, result.Im
 }

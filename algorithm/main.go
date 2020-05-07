@@ -57,7 +57,6 @@ func pruneOldIndicesInElastic() {
 		panic(err)
 	}
 
-
 	_, err = client.Do(&http.Request{
 		Method: http.MethodDelete,
 		URL: urlTrip,

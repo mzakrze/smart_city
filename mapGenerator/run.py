@@ -2,7 +2,7 @@ import argparse
 from enum import Enum
 import util
 
-from ManhattanMapGenerator import ManhattanMapGenerator
+from JunctionXGenerator import JunctionXGenerator
 from MapSerializer import MapSerializer
 
 class Algorithm(Enum):
@@ -22,7 +22,7 @@ class Algorithm(Enum):
 
 parser = argparse.ArgumentParser(description='Generates intersection as a graph.')
 
-generated_map = ManhattanMapGenerator().generate()
+generated_map = JunctionXGenerator().generate()
 
 MapSerializer().serialize(generated_map)
 

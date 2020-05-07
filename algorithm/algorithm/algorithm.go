@@ -1,23 +1,16 @@
 package algorithm
 
 import (
+	"fmt"
 	"math"
 	"mzakrze/smart_city/types"
 )
 
+type IntersectionState = int
 const (
-	VEHICLE_MASS = 1500
-	VEHICLE_POWER = 150
-	VEHICLE_BRAKING_DECELERATION = 3.5 // m/s^2
-
-	VEHICLE_MAX_SPEED = 15
-)
-
-type AccelerateState = int
-const (
-	ACCELERATING AccelerateState = 1 + iota
-	DECELERATING
-	SUSTAIN
+	BEFORE = 1 + iota
+	DURING
+	AFTER
 )
 
 
@@ -29,6 +22,7 @@ const STEP_INTERVAL_MS = 100
 // albo nawet lepiej - jeśli się da - oddzielna binarka
 
 type VehicleActor struct {
+	Id          types.VehicleId
 	Origin      types.DestinationPoint
 	Destination types.DestinationPoint
 
@@ -41,30 +35,43 @@ type VehicleActor struct {
 	Length    types.Meter
 
 	HasFinished bool
-	AccelerateState AccelerateState
 
-	roadGraph *types.Graph
-	route     []RouteElem
+	roadGraph                   *types.Graph
+	Route                       []RouteElem
+	accessToIntersectionGranted bool
+	intersectionState           IntersectionState
+	breakingPidController       *PIDController
+	aheadSensor                 *VehicleAheadSensor
 }
 
 type RouteElem struct {
-	node *types.Node
-	metersToDest types.Meter
-	metersDone types.Meter
+	Node *types.Node
+	MetersToDest types.Meter
+	MetersDone types.Meter
 }
 
-func InitVehicleActor(origin, destination types.DestinationPoint, roadGraph *types.Graph) *VehicleActor {
+func InitVehicleActor(id types.VehicleId, origin, destination types.DestinationPoint, ts types.Milisecond, roadGraph *types.Graph, sensor *VehicleAheadSensor) *VehicleActor {
 	res := &VehicleActor{
+		Id: id,
 		Origin: origin,
 		Destination: destination,
 		X: origin.X,
 		Y: origin.Y,
-		Speed_mps: 0,
+		Speed_mps: 10,
 		Width: 1.981,
 		Length: 4.636,
-		AccelerateState: ACCELERATING,
 		roadGraph: roadGraph,
+
+		accessToIntersectionGranted: false,
+		intersectionState: BEFORE,
+		aheadSensor: sensor,
 	}
+
+	const desiredDistanceToConflictZone = 0.0
+
+	res.breakingPidController = NewApproachConflictZonePidController()
+	res.breakingPidController.SetOutputLimits(-2.0, 3.5)
+	res.breakingPidController.Set(desiredDistanceToConflictZone, ts)
 
 	res.planRoute()
 
@@ -73,25 +80,25 @@ func InitVehicleActor(origin, destination types.DestinationPoint, roadGraph *typ
 
 func (v *VehicleActor) move(distSpare types.Meter) {
 
-	dest := &v.route[0]
+	dest := &v.Route[0]
 
-	xDiff := dest.node.X - v.X
-	yDiff := dest.node.Y - v.Y
+	xDiff := dest.Node.X - v.X
+	yDiff := dest.Node.Y - v.Y
 	d := math.Sqrt(xDiff * xDiff + yDiff * yDiff)
 
 	if d <= distSpare {
 		distSpare -= d
 
-		dest.metersDone += d
-		v.X = dest.node.X
-		v.Y = dest.node.Y
+		dest.MetersDone += d
+		v.X = dest.Node.X
+		v.Y = dest.Node.Y
 
-		if len(v.route) == 1 {
+		if len(v.Route) == 1 {
 			v.HasFinished = true
 			return
 		}
 
-		v.route = v.route[1:]
+		v.Route = v.Route[1:]
 		if distSpare > 0 {
 			v.move(distSpare)
 		}
@@ -102,42 +109,85 @@ func (v *VehicleActor) move(distSpare types.Meter) {
 	moveX := distSpare * xDiff / d
 	moveY := distSpare * yDiff / d
 
-	dest.metersDone = dest.metersDone + distSpare
+	dest.MetersDone = dest.MetersDone + distSpare
 	v.X += moveX
 	v.Y += moveY
 	v.Alpha = math.Atan(-moveY / moveX)
-
+	if v.Alpha == -0 {
+		v.Alpha = -math.Pi
+	}
 	if math.IsNaN(v.Alpha) {
 		panic("Alpha is NaN")
 	}
 }
 
-func (v *VehicleActor) Ping(ts types.Timestamp) {
+
+func (v *VehicleActor) calculateDistanceToConflictZone() float64 {
+	// FIXME - wykrywać pojazd przed
+	// (to będzie działać - jak samochod przed odjedzie - pid ogarnie i przyspieszy)
+	im := &v.roadGraph.IntersectionManager
+	x := math.Min(math.Abs(v.X - im.BboxLeft), math.Abs(v.X - im.BboxRight))
+	y := math.Min(math.Abs(v.Y - im.BboxDown), math.Abs(v.Y - im.BboxUp))
+
+	// what interests us is the whole not it's center point, hence minus half of length
+	r := math.Sqrt(x * x + y * y) - v.Length / 2
+	//fmt.Printf("dist: %f", r)
+	return r
+}
+
+func (v *VehicleActor) isInConflictZone() bool {
+	im := &v.roadGraph.IntersectionManager
+	return im.BboxDown <= v.Y && v.Y <= im.BboxUp && im.BboxLeft <= v.X && v.X <= im.BboxRight
+}
+
+func (v *VehicleActor) Ping(ts types.Milisecond) {
 	if v.HasFinished {
 		return
 	}
 
-	switch v.AccelerateState {
-	case SUSTAIN:
-	case DECELERATING:
-		delta_v := VEHICLE_BRAKING_DECELERATION * STEP_INTERVAL_MS / 1000
-		v.Speed_mps -= delta_v
-		if v.Speed_mps < 0 {
-			v.Speed_mps = 0
-		}
-	case ACCELERATING:
-		var delta_w float64 = VEHICLE_POWER * STEP_INTERVAL_MS / 1000
-		delta_v := math.Sqrt(2 * delta_w / VEHICLE_MASS)
-		v.Speed_mps += delta_v
+	wasInConflictZone := v.isInConflictZone()
 
-		if v.Speed_mps >= VEHICLE_MAX_SPEED {
-			v.AccelerateState = SUSTAIN
+	if v.intersectionState == BEFORE && v.accessToIntersectionGranted == false {
+		d1 := v.calculateDistanceToConflictZone()
+		d2 := v.aheadSensor.ScanVehiclesAhead(v) - 5
+		d := math.Min(d1, d2)
+
+		fmt.Printf("Distance to intersection: %f, distance other car: %f\n", d1, d2)
+
+		// can be negative
+		acceleration := v.breakingPidController.Feedback(d, ts)
+		//fmt.Printf(", acc: %f\n", acceleration)
+		v.Speed_mps += acceleration * STEP_INTERVAL_MS / 1000
+
+		dist := v.Speed_mps * STEP_INTERVAL_MS / 1000
+
+		//if dist - 0.5 > d { // TODO 0.2 tymczasowo - jest błąd, ale niewielki (odstęp pożądany między pojazdami to 2 metry, więc i tak sie nie zderzą)
+		//	panic("Vehicle crashed into an obstacle :(")
+		//}
+
+		v.move(dist)
+
+	} else if v.intersectionState == BEFORE && v.accessToIntersectionGranted == true {
+		if v.Speed_mps < 10 {
+			// acceleration = 2 m/s^2
+			v.Speed_mps += 2 * STEP_INTERVAL_MS / 1000
 		}
 	}
 
-	dist := v.Speed_mps * STEP_INTERVAL_MS / 1000
 
-	v.move(dist)
+
+	if v.isInConflictZone() {
+		//if v.accessToIntersectionGranted == false {
+		//	panic("Vehicle entered into intersection without permission")
+		//}
+		v.intersectionState = DURING
+	} else {
+		if wasInConflictZone {
+			v.intersectionState = AFTER
+		}
+	}
+
+
 }
 
 
@@ -163,10 +213,10 @@ func (v *VehicleActor) planRoute() {
 	dist := 0.0
 	var prevNode *types.Node = nil
 	for i := len(path)-1; i >= 0; i-- {
-		route[i].node = path[i]
+		route[i].Node = path[i]
 
 		if prevNode == nil {
-			route[i].metersToDest = dist
+			route[i].MetersToDest = dist
 		} else {
 			// find edge by id
 			edgeLength := -1.0
@@ -179,11 +229,11 @@ func (v *VehicleActor) planRoute() {
 				panic("Edge not found")
 			}
 			dist += edgeLength
-			route[i].metersToDest = dist
+			route[i].MetersToDest = dist
 		}
 		prevNode = path[i]
 	}
 
-	v.route = route
+	v.Route = route
 }
 
