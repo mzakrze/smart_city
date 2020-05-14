@@ -90,8 +90,6 @@ func (f *FluentLogger) VehicleCurrentLocation(data *FluentVehicleCurrentLocation
 		"@timestamp": fmt.Sprintf("%d", data.Timestamp),
 		"location": location,
 		"alpha": fmt.Sprintf("%f", data.Alpha),
-		"movex": fmt.Sprintf("%f", data.MoveX),
-		"movey": fmt.Sprintf("%f", data.MoveY),
 		"speed": fmt.Sprintf("%f", data.Speed),
 	}
 

@@ -20,7 +20,7 @@ func main() {
 	sensorLayer := vehicle_sensor.SensorLayerSingleton(allVehiclesProxy)
 	collisionDetector := util.NewCollisionDetector(allVehiclesProxy)
 	intersectionManager, err := vehicle.IntersectionManagerSingleton(communicationLayer, configuration.IntersectionPolicy); if err != nil { panic(err) }
-	fluentLogger, err := fluent.New(fluent.Config{}); if err != nil { panic(err) }
+	fluentLogger, err := fluent.New(fluent.Config{}); if err != nil { panic(err) }; defer fluentLogger.Close()
 	resultLogger := logging.ResultsLoggerSingleton(fluentLogger, graph.MapWidth, graph.MapWidth)
 
 	// create runner

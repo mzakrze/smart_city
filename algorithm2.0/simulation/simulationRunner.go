@@ -51,4 +51,10 @@ func SimulationRunnerSingleton(
 
 func (r *SimulationRunner) RunSimulation() {
 
+	// Premise: vehicle must appear and disappear only on full second (where millisecond part is 000 + next step)
+
+
+
+
+
 }
