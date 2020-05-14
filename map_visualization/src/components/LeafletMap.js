@@ -38,7 +38,7 @@ class LeafletMap extends React.Component{
     }
 
     componentDidMount() {
-        this.map = L.map('leaflet-map-id').setView([52.223510, 21.0238], 19);
+        this.map = L.map('leaflet-map-id').setView([52.219111, 21.011711], 19);
 
         // TODO - experiment with tile servers: https://wiki.openstreetmap.org/wiki/Tile_servers
         var mapTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {

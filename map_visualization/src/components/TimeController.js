@@ -14,14 +14,8 @@ class TimeController extends React.Component {
     }
 
     componentDidMount() {
-        fetch("/simulation-log-1/_search", {
+        fetch("/simulation-info/_search", {
             method: 'POST',
-            body: JSON.stringify({
-                "aggs" : {
-                    "min_date": {"min": {"field": "@timestamp"}},
-                    "max_date": {"max": {"field": "@timestamp"}}
-                }
-            }),
             headers: {
                 'Accept': 'application/json',
                 'Content-Type': 'application/json'
@@ -29,9 +23,11 @@ class TimeController extends React.Component {
         })
             .then(res => res.json())
             .then(res => {
+                debugger;
+                let max = res.hits.hits[0]._source.simulation_max_ts;
                 this.setState({
-                    min: res.aggregations.min_date.value,
-                    max: res.aggregations.max_date.value,
+                    min: 0,
+                    max: max,
                     initialized: true
                 })
             })

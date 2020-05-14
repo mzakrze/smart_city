@@ -1,25 +1,11 @@
 
 class ElasticsearchFacade {
 
-    /*
-    TODO: 
-    - narazie zamockowana nazwa 1 symulacji o nazwie "1"
-    - docelowo: baza danych symulacji + mozliwosc wyboru
-    */
-
-    /*
-    TODO:
-    - narazie stworzone w ES 2 indexy
-    - docelowo - stworzyć 2 index template
-    */
 
     // TODO - wstawić w serviceWorker
 
     constructor() {
-        const simulationNameMock = "";
-        const INDEX_SEARCH_SUFFIX = "-search"
-        this.index = "simulation-log-1";
-        this.searchIndex = "simulation-map-1";
+        this.searchIndex = "simulation-map";
 
     }
 
@@ -79,7 +65,7 @@ class ElasticsearchFacade {
                 query: {
                     bool: {
                         filter: [
-                            { term: { start_second: epochSecond }},
+                            { term: { second: epochSecond }},
                         ]
                     }
                 }})})
@@ -113,29 +99,6 @@ class ElasticsearchFacade {
 
     }
 
-    getMinMaxTimestamp() {
-        return new Promise(doResolve => {
-            fetch("/" + this.index + "/_search", {
-                method: 'POST',
-                body: JSON.stringify({
-                    "aggs" : {
-                        "min_date": {"min": {"field": "@timestamp"}},
-                        "max_date": {"max": {"field": "@timestamp"}}
-                    }
-                }),
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json'
-                }})
-            .then(res => res.json())
-            .then(res => {
-                doResolve({
-                    minTimestamp: res.aggregations.min_date.value,
-                    maxTimestamp: res.aggregations.max_date.value
-                })
-            })
-        });
-    }
 
 }
 

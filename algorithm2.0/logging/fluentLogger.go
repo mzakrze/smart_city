@@ -11,6 +11,7 @@ import (
 const mapTag = "map"
 const infoTag = "info"
 const vehicleTag = "vehicle"
+const vehicleStepTag = "vehiclestep"
 const intersectionTag = "intersection"
 
 /*
@@ -48,6 +49,8 @@ func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Mete
 			vehicleLogSpeed: make(map[types.VehicleId][]types.MetersPerSecond),
 			vehicleLogAcc: make(map[types.VehicleId][]types.MetersPerSecond2),
 			vehicleLogArrive: make(map[types.VehicleId]types.Millisecond),
+			intersectionLogVehiclesArrive: make(map[types.Second]int),
+			intersectionLogVehiclesLeave: make(map[types.Second]int),
 		}
 	}
 	return instance
@@ -60,27 +63,37 @@ func (f *ResultsLogger) SimulationStarted(simName string, startTime time.Time) {
 func (f *ResultsLogger) SimulationFinished(finishTime time.Time) {
 	f.simulationFinishTime = finishTime
 	f.sendInfoLog()
+	f.sendIntersectionLog()
 }
 
 func (f *ResultsLogger) VehicleStepReport(id types.VehicleId, ts types.Millisecond, x types.XCoord, y types.YCoord, alpha types.Angle, speed types.MetersPerSecond, acc types.MetersPerSecond2) {
+	f.maxTs = int(math.Max(float64(ts), float64(f.maxTs)))
+
+	if ts % 100 == 0 {
+		f.sendVehicleStepReport(id, ts, x, y, speed, acc)
+	}
+
 	var stepInSecond = int((ts % 1000) / f.simulationStepInterval)
 
 	if ts % 1000 == 0 {
-		f.sendMapLogAndFlush()
-		f.sendIntersectionLogAndFlush()
-		f.currentSecond += 1
+		f.currentSecond = types.Second(ts / 1000)
+		f.intersectionLogVehiclesArrive[f.currentSecond] = 0
+		f.intersectionLogVehiclesLeave[f.currentSecond] = 0
 	}
 
 	f.appendToMapLog(stepInSecond, id, x, y, alpha)
 	f.appendToVehicleLog(stepInSecond, id, speed, acc)
 
+	if ts % 1000 == 990 {
+		f.sendMapLogAndFlush(id)
+	}
 }
 
 func (f *ResultsLogger) VehicleFinished(id types.VehicleId, ts types.Millisecond) {
-	if ts % 1000 != 0 {
-		panic("Premise broken :( Vehicle should start and finish only on full second")
+	if ts % 1000 != 990 {
+		panic("Premise broken :( Vehicle should finish only on full second minus step interval")
 	}
-	f.intersectionLogVehiclesLeave += 1
+	f.intersectionLogVehiclesLeave[f.currentSecond] += 1
 	f.sendVehicleLogAndFlush(id, ts)
 }
 
@@ -92,6 +105,7 @@ type ResultsLogger struct {
 	simulationName         string
 	simulationStartTime    time.Time
 	simulationFinishTime   time.Time
+	maxTs 				   int
 
 	simulationStepInterval types.Millisecond
 	bucketSize      int
@@ -108,8 +122,9 @@ type ResultsLogger struct {
 	vehicleLogAcc   map[types.VehicleId][]types.MetersPerSecond2
 	vehicleLogArrive   map[types.VehicleId]types.Millisecond
 
-	intersectionLogVehiclesArrive int
-	intersectionLogVehiclesLeave int
+	intersectionLogVehiclesArrive map[types.Second]int
+	intersectionLogVehiclesLeave map[types.Second]int
+
 }
 
 
@@ -143,8 +158,6 @@ func (f *ResultsLogger) appendToMapLog(step int, id types.VehicleId, x types.XCo
 		if step != 0 { panic("Illegal bucket state") }
 		f.mapLogLocation[id] = make([]types.LocationStruct, f.bucketSize)
 		f.mapLogAlpha[id] = make([]types.Angle, f.bucketSize)
-
-		f.intersectionLogVehiclesArrive += 1
 	}
 	f.mapLogLocation[id][step] = types.LocationStruct{Lon: f.xToLon(x), Lat: f.yToLat(y)}
 	f.mapLogAlpha[id][step] = alpha
@@ -164,65 +177,59 @@ func (f *ResultsLogger) sendInfoLog() {
 		"simulation_name": f.simulationName,
 		"simulation_started_ts": fmt.Sprintf("%d", f.simulationStartTime.Second()),
 		"simulation_finished_ts": fmt.Sprintf("%d", f.simulationFinishTime.Second()),
+		"simulation_max_ts": fmt.Sprintf("%d", f.maxTs),
 	}
 
 	err := f.logger.Post(infoTag, msg); if err != nil { panic(err) }
 }
 
-func (f *ResultsLogger) sendMapLogAndFlush() {
+func (f *ResultsLogger) sendMapLogAndFlush(vId types.VehicleId) {
+	alpha := f.mapLogAlpha[vId]
+	location := f.mapLogLocation[vId]
 
-	toSend := []map[string]string{}
+	delete(f.mapLogAlpha, vId)
+	delete(f.mapLogLocation, vId)
 
-	for vId := range f.mapLogAlpha { // as well could be 'range f.mapLogLocation' (keys in both must be the same)
-		alpha := f.mapLogAlpha[vId]
-		location := f.mapLogLocation[vId]
+	bytes, err := json.Marshal(location); if err != nil { panic(err) }
+	locationJson := string(bytes)
+	bytesAlpha, err := json.Marshal(alpha); if err != nil { panic(err) }
+	alphaJson := string(bytesAlpha)
 
-		bytes, err := json.Marshal(location); if err != nil { panic(err) }
-		locationJson := string(bytes)
-
-		bytesAlpha, err := json.Marshal(alpha); if err != nil { panic(err) }
-		alphaJson := string(bytesAlpha)
-
-		msg := map[string]string {
-			"simulation_name": f.simulationName,
-			"vehicle_id": fmt.Sprintf("%d", vId),
-			"second": fmt.Sprintf("%d", f.currentSecond),
-			"location_array": locationJson,
-			"alpha_array": alphaJson,
-		}
-
-		toSend = append(toSend, msg)
+	msg := map[string]string {
+		"simulation_name": f.simulationName,
+		"vehicle_id": fmt.Sprintf("%d", vId),
+		"second": fmt.Sprintf("%d", f.currentSecond),
+		"location_array": locationJson,
+		"alpha_array": alphaJson,
 	}
 
-	for _, msg := range toSend {
-		err := f.logger.Post(mapTag, msg)
+	err = f.logger.Post(mapTag, msg)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (f *ResultsLogger) sendIntersectionLog() {
+	for sec := types.Second(0); sec <= f.currentSecond; sec++ {
+		msg := map[string]string {
+			"simulation_name": f.simulationName,
+			"second": fmt.Sprintf("%d", sec),
+			"arrive_no": fmt.Sprintf("%d", f.intersectionLogVehiclesArrive[sec]),
+			"leave_no": fmt.Sprintf("%d", f.intersectionLogVehiclesLeave[sec]),
+		}
+
+		err := f.logger.Post(intersectionTag, msg);
 		if err != nil {
 			panic(err)
 		}
 	}
-
-	f.mapLogAlpha = make(map[types.VehicleId][]types.Angle)
-	f.mapLogLocation = make(map[types.VehicleId][]types.LocationStruct)
-}
-
-func (f *ResultsLogger) sendIntersectionLogAndFlush() {
-	msg := map[string]string {
-		"simulation_name": f.simulationName,
-		"second": fmt.Sprintf("%d", f.currentSecond),
-		"arrive_no": fmt.Sprintf("%d", f.intersectionLogVehiclesArrive),
-		"leave_no": fmt.Sprintf("%d", f.intersectionLogVehiclesLeave),
-	}
-	err := f.logger.Post(intersectionTag, msg); if err != nil { panic(err) }
-
-	f.intersectionLogVehiclesLeave = 0
-	f.intersectionLogVehiclesArrive = 0
 }
 
 func (f *ResultsLogger) sendVehicleLogAndFlush(id types.VehicleId, leaveTs types.Millisecond) {
 	acc := f.vehicleLogAcc[id]
 	speed := f.vehicleLogSpeed[id]
 	arriveTs := f.vehicleLogArrive[id]
-	duration := leaveTs - arriveTs
+	duration := int((leaveTs - arriveTs) / 1000)
 
 	bytesAcc, err := json.Marshal(acc); if err != nil { panic(err) }
 	accJson := string(bytesAcc)
@@ -245,5 +252,19 @@ func (f *ResultsLogger) sendVehicleLogAndFlush(id types.VehicleId, leaveTs types
 	delete(f.vehicleLogArrive, id)
 	delete(f.vehicleLogSpeed, id)
 	delete(f.vehicleLogArrive, id)
+}
+
+func (f *ResultsLogger) sendVehicleStepReport(id types.VehicleId, ts types.Millisecond, xCoord types.XCoord, yCoord types.YCoord, speed types.MetersPerSecond, acc types.MetersPerSecond2) {
+	// FIXME - nie jest otestowane
+	msg := map[string]string {
+		"simulation_name": f.simulationName,
+		"vehicle_id": fmt.Sprintf("%d", id),
+		"speed": fmt.Sprintf("%f", speed),
+		"acc": fmt.Sprintf("%f", acc),
+		"ts": fmt.Sprintf("%d", ts),
+	}
+
+	err := f.logger.Post(vehicleStepTag, msg); if err != nil { panic(err) }
+
 }
 

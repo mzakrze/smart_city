@@ -11,9 +11,9 @@ import TimeController from './components/TimeController';
  */
 export const Settings = {
   
-  SamplingPeriod_ms: 100,
+  SamplingPeriod_ms: 10,
 
-}
+};
 
 class App extends React.Component {
 
