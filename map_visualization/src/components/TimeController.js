@@ -23,7 +23,11 @@ class TimeController extends React.Component {
         })
             .then(res => res.json())
             .then(res => {
-                debugger;
+
+                if (res.hits.hits.length == 0) {
+                    return;
+                }
+
                 let max = res.hits.hits[0]._source.simulation_max_ts;
                 this.setState({
                     min: 0,

@@ -335,6 +335,7 @@ const GraphPlotLayer = L.CanvasLayer.extend({
         let nodes = {}
         for(let nId in this.theGraph.nodes) {
             let n = this.theGraph.nodes[nId]
+            console.log(JSON.stringify(n))
             let {x, y} = this._map.latLngToContainerPoint(new L.LatLng(n.lat, n.lon));
             nodes[nId] = {x, y}
             ctx.fillStyle = "#000000";

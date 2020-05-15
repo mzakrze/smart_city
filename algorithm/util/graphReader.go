@@ -20,8 +20,10 @@ type node struct {
 	Id int32
 	X float64
 	Y float64
-	Entrypoint int
-	Exitpoint int
+	IsEntryPoint bool
+	IsExitPoint bool
+	EntryPointId int
+	ExitPointId int
 	Lat float64
 	Lon float64
 }
@@ -51,8 +53,10 @@ func assembleGraph(nodesRaw []node, edgesRaw []edge, mapBox types.MapBBox, im ty
 			Id: n.Id,
 			X: n.X,
 			Y: n.Y,
-			IsEntrypoint: n.Entrypoint,
-			IsExitpoint: n.Exitpoint,
+			IsEntryPoint: n.IsEntryPoint,
+			EntryPointId: n.EntryPointId,
+			IsExitPoint: n.IsExitPoint,
+			ExitPointId: n.ExitPointId,
 			Edges: []types.Edge{},
 		}
 

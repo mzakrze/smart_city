@@ -60,8 +60,10 @@ type Node struct {
 	X            XCoord
 	Y            YCoord
 	Edges        []Edge
-	IsEntrypoint RoadCluster
-	IsExitpoint  RoadCluster
+	IsEntryPoint bool
+	IsExitPoint bool
+	EntryPointId int
+	ExitPointId	int
 }
 
 type Edge struct {

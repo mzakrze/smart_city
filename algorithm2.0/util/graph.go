@@ -9,6 +9,8 @@ type Graph struct {
 	ImX			 types.XCoord
 	ImY			 types.YCoord
 	Nodes        map[types.NodeId]Node
+	Entrypoints	 []*Node
+	Exitpoints	 []*Node
 }
 
 type ConflictZone struct {
@@ -21,8 +23,9 @@ type ConflictZone struct {
 type Node struct {
 	Id types.NodeId
 	IsEntryPoint bool
-	IsExitPoint	bool
-	WayId types.WayId
+	IsExitPoint bool
+	EntryPointId int
+	ExitPointId	int
 	EdgesFrom []Edge
 }
 

@@ -1,15 +1,27 @@
 import json
+import math
 
 NODES_FILE = "../map_visualization/public/nodes.ndjson"
 EDGES_FILE = "../map_visualization/public/edges.ndjson"
 META_FILE = "../map_visualization/public/graph.json"
 
+GRAPH_FILE = "../map_visualization/public/intersection_graph.json"
+
 class MapSerializer:
 
     def serialize(self, graph):
 
-        # FIXME - calculate bbox
-        bbox = {"north": 52.2254, "south": 52.2231, "west": 21.0233, "east": 21.0263, "width": 204, "height": 255}
+        min_lat = 52.219111
+        min_lon = 21.011711
+
+        earth = 6378.137  # radius of the earth in kilometer
+        m = (1.0 / ((2.0 * math.pi / 360.0) * earth)) / 1000
+
+        max_lat = min_lat + (graph["mapHeight"] * m)
+        max_lon = min_lon + (graph["mapWidth"] * m) / math.cos(min_lat * (math.pi / 180.0))
+
+        bbox = {"north": max_lat, "south": min_lat, "west": min_lon, "east": max_lon,
+                "width": graph["mapWidth"], "height": graph["mapHeight"]}
 
         meta = {
             "graph": bbox,
@@ -30,6 +42,9 @@ class MapSerializer:
             for e in graph["edges"]:
                 json.dump(e, f)
                 f.write("\n")
+
+        with open(GRAPH_FILE, "w") as f:
+            json.dump(graph, f, indent=4)
 
     def add_coords(self, bbox, graph):
         """
