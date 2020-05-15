@@ -4,6 +4,7 @@ import './LeafletCanvasLayer.js';
 import ElasticsearchFacade from './ElasticsearchFacade.js';
 import { Settings } from './../App.js';
 import TripIndexFacade from "./TripIndexFacade";
+import LeafletRoadPlotLayer from "./LeafletRoadPlotLayer";
 
 const L = window.L;
 class LeafletMap extends React.Component{
@@ -194,6 +195,10 @@ class LeafletMap extends React.Component{
         this.graphPlotLayer
             .addTo(this.map);
 
+        this.roadPlotLayer = new LeafletRoadPlotLayer();
+        this.roadPlotLayer
+            .addTo(this.map);
+
         var scale = L.control.scale({
             metric: true,
             imperial: false
@@ -228,11 +233,13 @@ class LeafletMap extends React.Component{
 
                 const graph = { nodes, edges }
                 that.graphPlotLayer.initGraphPlotLayer(graph)
+                that.roadPlotLayer.initRoadPlotLayer(graph)
             })
 
         const overlayers = {
             "vehicles": this.simulationVisualizationLayer,
-            "Graph": this.graphPlotLayer
+            "Graph": this.graphPlotLayer,
+            "Road": this.roadPlotLayer,
         };
         const baseLayers = { };
         L.control.layers(baseLayers, overlayers).addTo(this.map);
@@ -335,7 +342,6 @@ const GraphPlotLayer = L.CanvasLayer.extend({
         let nodes = {}
         for(let nId in this.theGraph.nodes) {
             let n = this.theGraph.nodes[nId]
-            console.log(JSON.stringify(n))
             let {x, y} = this._map.latLngToContainerPoint(new L.LatLng(n.lat, n.lon));
             nodes[nId] = {x, y}
             ctx.fillStyle = "#000000";
