@@ -1,11 +1,11 @@
 import json
 import math
 
-NODES_FILE = "../map_visualization/public/nodes.ndjson"
-EDGES_FILE = "../map_visualization/public/edges.ndjson"
-META_FILE = "../map_visualization/public/graph.json"
+NODES_FILE = "map_visualization/public/nodes.ndjson"
+EDGES_FILE = "map_visualization/public/edges.ndjson"
+META_FILE = "map_visualization/public/graph.json"
 
-GRAPH_FILE = "../map_visualization/public/intersection_graph.json"
+GRAPH_FILE = "map_visualization/public/intersection_graph.json"
 
 class MapSerializer:
 
@@ -45,6 +45,8 @@ class MapSerializer:
 
         with open(GRAPH_FILE, "w") as f:
             json.dump(graph, f, indent=4)
+
+        return json.dumps(graph)
 
     def add_coords(self, bbox, graph):
         """

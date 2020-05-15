@@ -2,7 +2,7 @@ import math
 
 
 class Config:
-    INTERSECTION_APPROACH_LENGTH = 50  # [meters]
+    INTERSECTION_APPROACH_LENGTH = 100  # [meters]
     LANE_WIDTH = 3  # [meters]
 
 # Układ odniesienia:
@@ -22,7 +22,7 @@ class JunctionXGenerator:
 
         self.node_seq = 0
 
-    def generate(self):
+    def generate(self, lanes):
         unique_ids = {}
 
         def generate_id(*ns):
@@ -37,6 +37,12 @@ class JunctionXGenerator:
                 "from": node_from["id"],
                 "to": node_to["id"],
                 "arc": True,
+            })
+
+        def add_edge(node_from, node_to):
+            edges.append({
+                "from": node_from["id"],
+                "to": node_to["id"],
             })
 
         def generate_arc(node_from, node_to, radius, turn_dir, quarter):
@@ -151,93 +157,145 @@ class JunctionXGenerator:
         nodes = []
         edges = []
 
-        n1_a = {"x": 0, "y": self.intersection_center["y"] - Config.LANE_WIDTH / 2, "entrypoint": 1}
-        n2_a = {"x": 0, "y": self.intersection_center["y"] + Config.LANE_WIDTH / 2, "exitpoint": 1}
-        n3_a = {"x": self.map_width, "y": self.intersection_center["y"] - Config.LANE_WIDTH / 2, "exitpoint": 2}
-        n4_a = {"x": self.map_width, "y": self.intersection_center["y"] + Config.LANE_WIDTH / 2, "entrypoint": 2}
-        generate_id(n1_a, n2_a, n3_a, n4_a)
-        nodes = nodes + [n1_a, n2_a, n3_a, n4_a]
+        mArr = []
 
-        n1 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH / 2, "y": 0, "exitpoint": 3}
-        n2 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH / 2, "y": 0, "entrypoint": 3}
-        n3 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH / 2, "y": self.map_height, "entrypoint": 4}
-        n4 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH / 2, "y": self.map_height, "exitpoint": 4}
-        generate_id(n1, n2, n3, n4)
-        nodes = nodes + [n1, n2, n3, n4]
+        for n in range(-lanes, lanes):
+            if n < lanes:
+                mArr.append(- n * Config.LANE_WIDTH - Config.LANE_WIDTH / 2)
+            elif n == lanes:
+                mArr.append(Config.LANE_WIDTH / 2)
+            else:
+                mArr.append(n * Config.LANE_WIDTH + Config.LANE_WIDTH / 2)
+        mArr.sort()
+        pointsId = [x for x in range(lanes - 1, 0, -1)] + [0] + [x for x in range(lanes)]
 
-        #      |   |
-        #      n1  n2
-        #
-        # --n8         n3---
-        #
-        # --n7         n4---
-        #
-        #      n6  n5
-        #       |   |
-        n_1 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH / 2, "y": self.intersection_center["y"] + Config.LANE_WIDTH    }
-        n_2 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH / 2, "y": self.intersection_center["y"] + Config.LANE_WIDTH    }
-        n_3 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH    , "y": self.intersection_center["y"] + Config.LANE_WIDTH / 2}
-        n_4 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH    , "y": self.intersection_center["y"] - Config.LANE_WIDTH / 2}
-        n_5 = {"x": self.intersection_center["x"] + Config.LANE_WIDTH / 2, "y": self.intersection_center["y"] - Config.LANE_WIDTH    }
-        n_6 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH / 2, "y": self.intersection_center["y"] - Config.LANE_WIDTH    }
-        n_7 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH    , "y": self.intersection_center["y"] - Config.LANE_WIDTH / 2}
-        n_8 = {"x": self.intersection_center["x"] - Config.LANE_WIDTH    , "y": self.intersection_center["y"] + Config.LANE_WIDTH / 2}
-        generate_id(n_1, n_2, n_3, n_4, n_5, n_6, n_7, n_8)
-        nodes = nodes + [n_1, n_2, n_3, n_4, n_5, n_6, n_7, n_8]
+        i_x = self.intersection_center["x"]
+        i_y = self.intersection_center["y"]
+        i_n = {}
+        counter = -1
+        for lane in range(lanes * 2):
+            counter += 1
+            entrypoint = mArr[lane] < 0
+            exitpoint = not entrypoint
 
-        generate_arc(n_3, n_2, Config.LANE_WIDTH / 2, "right", 4)
-        generate_arc(n_3, n_6, Config.LANE_WIDTH * 1.5, "left", 1)
-        add_edge_arc(n_3, n_8)
-        generate_arc(n_5, n_4, Config.LANE_WIDTH / 2, "right", 1)
-        generate_arc(n_5, n_8, Config.LANE_WIDTH * 1.5, "left", 2)
-        add_edge_arc(n_5, n_2)
-        generate_arc(n_7, n_6, Config.LANE_WIDTH / 2, "right", 2)
-        generate_arc(n_7, n_2, Config.LANE_WIDTH * 1.5, "left", 3)
-        add_edge_arc(n_7, n_4)
-        generate_arc(n_1, n_8, Config.LANE_WIDTH / 2, "right", 3)
-        generate_arc(n_1, n_4, Config.LANE_WIDTH * 1.5, "left", 4)
-        add_edge_arc(n_1, n_6)
+            # up
+            x = i_x + mArr[lane]
+            y = i_y + Config.LANE_WIDTH * lanes * 2
+            n_u_i = {"x": x, "y": y}
+            n_u_e = {"x": x, "y": self.map_height}
+            generate_id(n_u_i, n_u_e)
+            nodes = nodes + [n_u_i, n_u_e]
+            if exitpoint:
+                n_u_e["isExitPoint"] = True
+                n_u_e["exitPointId"] = pointsId[counter]
+                add_edge(n_u_i, n_u_e)
+            if entrypoint:
+                n_u_e["isEntryPoint"] = True
+                n_u_e["entryPointId"] = pointsId[counter]
+                add_edge(n_u_e, n_u_i)
+            i_n["u" + str(counter)] = n_u_i
 
-        edges.append({
-            "from": (0, n_7["y"]),
-            "to": n_7["id"],
-        })
-        edges.append({
-            "from": n_8["id"],
-            "to": (0, n_8["y"]),
-        })
-        edges.append({
-            "from": (self.map_width, n_3["y"]),
-            "to": n_3["id"],
-        })
-        edges.append({
-            "from": n_4["id"],
-            "to":  (self.map_width, n_4["y"]),
-        })
-        edges.append({
-            "from":(n_1["x"], self.map_height),
-            "to":  n_1["id"],
-        })
-        edges.append({
-            "from": n_2["id"],
-            "to":  (n_2["x"], self.map_height),
-        })
-        edges.append({
-            "from": (n_5["x"], 0),
-            "to": n_5["id"],
-        })
-        edges.append({
-            "from": n_6["id"],
-            "to": (n_6["x"], 0),
-        })
+            # down
+            x = i_x - mArr[lane]
+            y = i_y - Config.LANE_WIDTH * lanes * 2
+            n_d_i = {"x": x, "y": y}
+            n_d_e = {"x": x, "y": 0, entrypoint: entrypoint, exitpoint: exitpoint}
+            generate_id(n_d_i, n_d_e)
+            nodes = nodes + [n_d_i, n_d_e]
+            if exitpoint:
+                n_d_e["isExitPoint"] = True
+                n_d_e["exitPointId"] = pointsId[counter]
+                add_edge(n_d_i, n_d_e)
+            if entrypoint:
+                n_d_e["isEntryPoint"] = True
+                n_d_e["entryPointId"] = pointsId[counter]
+                add_edge(n_d_e, n_d_i)
+            i_n["d" + str(counter)] = n_d_i
+
+            # right
+            x = i_x + Config.LANE_WIDTH * lanes * 2
+            y = i_y - mArr[lane]
+            n_r_i = {"x": x, "y": y}
+            n_r_e = {"x": self.map_width, "y": y, entrypoint: entrypoint, exitpoint: exitpoint}
+            generate_id(n_r_i, n_r_e)
+            nodes = nodes + [n_r_i, n_r_e]
+            if exitpoint:
+                n_r_e["isExitPoint"] = True
+                n_r_e["exitPointId"] = pointsId[counter]
+                add_edge(n_r_i, n_r_e)
+            if entrypoint:
+                n_r_e["isEntryPoint"] = True
+                n_r_e["entryPointId"] = pointsId[counter]
+                add_edge(n_r_e, n_r_i)
+            i_n["r" + str(counter)] = n_r_i
+
+            # left
+            x = i_x - Config.LANE_WIDTH * lanes * 2
+            y = i_y + mArr[lane]
+            n_l_i = {"x": x, "y": y}
+            n_l_e = {"x": 0, "y": y, entrypoint: entrypoint, exitpoint: exitpoint}
+            generate_id(n_l_i, n_l_e)
+            nodes = nodes + [n_l_i, n_l_e]
+            if exitpoint:
+                n_l_e["isExitPoint"] = True
+                n_l_e["exitPointId"] = pointsId[counter]
+                add_edge(n_l_i, n_l_e)
+            if entrypoint:
+                n_l_e["isEntryPoint"] = True
+                n_l_e["entryPointId"] = pointsId[counter]
+                add_edge(n_l_e, n_l_i)
+            i_n["l" + str(counter)] = n_l_i
+
+
+        for lane in range(lanes):
+            # u->l
+            f = i_n["u" + str(lane)]
+            t = i_n["l" + str(lanes * 2 - 1 - lane)]
+            generate_arc(f, t, math.fabs(f["x"] - t["x"]), "right", 3)
+            # u->r
+            t = i_n["r" + str(lanes * 2 - 1 - lane)]
+            generate_arc(f, t, math.fabs(f["x"] - t["x"]), "left", 4)
+            # u->d
+            t = i_n["d" + str(lanes * 2 - 1 - lane)]
+            add_edge(f, t)
+            # r->u
+            f = i_n["r" + str(lane)]
+            t = i_n["u" + str(lanes * 2 - 1 - lane)]
+            generate_arc(f, t, math.fabs(f["x"] - t["x"]), "right", 4)
+            # r->d
+            t = i_n["d" + str(lanes * 2 - 1 - lane)]
+            generate_arc(f, t, math.fabs(f["x"] - t["x"]), "left", 1)
+            # r->l
+            t = i_n["l" + str(lanes * 2 - 1 - lane)]
+            add_edge(f, t)
+            # d->l
+            f = i_n["d" + str(lane)]
+            t = i_n["l" + str(lanes * 2 - 1 - lane)]
+            generate_arc(f, t, math.fabs(f["x"] - t["x"]), "left", 2)
+            # d->r
+            t = i_n["r" + str(lanes * 2 - 1 - lane)]
+            generate_arc(f, t, math.fabs(f["x"] - t["x"]), "right", 1)
+            # d->u
+            t = i_n["u" + str(lanes * 2 - 1 - lane)]
+            add_edge(f, t)
+            # l->u
+            f = i_n["l" + str(lane)]
+            t = i_n["u" + str(lanes * 2 - 1 - lane)]
+            generate_arc(f, t, math.fabs(f["x"] - t["x"]), "left", 3)
+            # l->d
+            t = i_n["d" + str(lanes * 2 - 1 - lane)]
+            generate_arc(f, t, math.fabs(f["x"] - t["x"]), "right", 2)
+            # l->r
+            t = i_n["r" + str(lanes * 2 - 1 - lane)]
+            add_edge(f, t)
 
         self.fix_nodes_ids(nodes, edges)
 
         intersection_manager = {
-            "bboxUp": self.intersection_center["y"] + Config.LANE_WIDTH,
-            "bboxDown": self.intersection_center["y"] - Config.LANE_WIDTH,
-            "bboxLeft": self.intersection_center["x"] - Config.LANE_WIDTH,
-            "bboxRight": self.intersection_center["x"] + Config.LANE_WIDTH,
+            "bboxUp": self.intersection_center["y"] + Config.LANE_WIDTH * lanes * 2,
+            "bboxDown": self.intersection_center["y"] - Config.LANE_WIDTH * lanes * 2,
+            "bboxLeft": self.intersection_center["x"] - Config.LANE_WIDTH * lanes * 2,
+            "bboxRight": self.intersection_center["x"] + Config.LANE_WIDTH * lanes * 2,
         }
 
         return {
