@@ -2,6 +2,7 @@ package vehicle
 
 import (
 	"algorithm2.0/types"
+	"math/rand"
 )
 
 type AimProtocolMessageType = int32
@@ -14,23 +15,28 @@ type DsrcV2RMessage struct {
 	MsgType AimProtocolMessageType
 	TsSent types.Millisecond
 	Sender types.VehicleId
-	IsFirstOnIntersection bool
-	VehicleInFrontId types.VehicleId
 	X types.XCoord
 	Y types.YCoord
 	Speed types.MetersPerSecond
 	Acc types.MetersPerSecond2
+	ApproachConflictZoneTs types.Millisecond
+	ApproachConflictZoneSpeedMax types.MetersPerSecond
+	ApproachConflictZoneSpeedMin types.MetersPerSecond
+	LeaveConflictZoneTs types.Millisecond
 }
 
 type DsrcR2VMessage struct {
-	msgType AimProtocolMessageType
-	tsSent types.Millisecond
-	receiver types.VehicleId
+	msgType                 AimProtocolMessageType
+	tsSent                  types.Millisecond
+	receiver                types.VehicleId
+	reservationFromTs       types.Millisecond
+	reservationToTs         types.Millisecond
+	reservationDesiredSpeed types.MetersPerSecond
 }
 
 func CommunicationLayerSingleton(proxy *AllVehicleProxy) *CommunicationLayer {
 	if instanceCommunication == nil {
-		instanceCommunication = &CommunicationLayer{proxy: proxy}
+		instanceCommunication = &CommunicationLayer{proxy: proxy, vehicleToReceive: make(map[types.VehicleId][]DsrcR2VMessage)}
 	}
 	return instanceCommunication
 }
@@ -56,6 +62,12 @@ func (c *CommunicationLayer) VehicleReceive(id types.VehicleId) []DsrcR2VMessage
 
 func (c *CommunicationLayer) IntersectionManagerReceive() []DsrcV2RMessage {
 	queue := c.imToReceive
+	rand.Shuffle(len(queue), func(i, j int) {
+		el := queue[i]
+		queue[i] = queue[j]
+		queue[j] = el
+
+	})
 	c.imToReceive = []DsrcV2RMessage{}
 	return queue
 }

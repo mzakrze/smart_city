@@ -26,7 +26,7 @@ type IResultLogger interface {
 	Post(tag string, msg interface{}) error
 }
 
-func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Meter) *ResultsLogger {
+func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Meter, simulationDurationSeconds float64) *ResultsLogger {
 	const simulationStep = types.Millisecond(10)
 
 	// Let's assume that simulation area is small enough to calculate as if Earth is flat
@@ -53,6 +53,7 @@ func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Mete
 			vehicleLogArrive: make(map[types.VehicleId]types.Millisecond),
 			intersectionLogVehiclesArrive: make(map[types.Second]int),
 			intersectionLogVehiclesLeave: make(map[types.Second]int),
+			simulationDurationSeconds: simulationDurationSeconds,
 		}
 	}
 	return instance
@@ -97,6 +98,9 @@ func (f *ResultsLogger) VehicleFinished(id types.VehicleId, ts types.Millisecond
 	}
 	f.intersectionLogVehiclesLeave[f.currentSecond] += 1
 	f.sendVehicleLogAndFlush(id, ts)
+	if ts < 1000 * types.Millisecond(f.simulationDurationSeconds) {
+		f.vehiclesFinishedThroughput += 1
+	}
 }
 
 
@@ -104,15 +108,15 @@ var instance *ResultsLogger = nil
 type ResultsLogger struct {
 	logger IResultLogger
 
-	simulationName         string
-	simulationStartTime    time.Time
-	simulationFinishTime   time.Time
-	maxTs 				   int
+	simulationName       string
+	simulationStartTime  time.Time
+	simulationFinishTime time.Time
+	maxTs                int
 
 	simulationStepInterval types.Millisecond
-	bucketSize      int
+	bucketSize             int
 
-	currentSecond  types.Second
+	currentSecond types.Second
 
 	yToLat func(y types.YCoord) types.Latitude
 	xToLon func(x types.XCoord) types.Longitude
@@ -120,13 +124,14 @@ type ResultsLogger struct {
 	mapLogLocation map[types.VehicleId][]types.LocationStruct
 	mapLogAlpha    map[types.VehicleId][]types.Angle
 
-	vehicleLogSpeed map[types.VehicleId][]types.MetersPerSecond
-	vehicleLogAcc   map[types.VehicleId][]types.MetersPerSecond2
-	vehicleLogArrive   map[types.VehicleId]types.Millisecond
+	vehicleLogSpeed  map[types.VehicleId][]types.MetersPerSecond
+	vehicleLogAcc    map[types.VehicleId][]types.MetersPerSecond2
+	vehicleLogArrive map[types.VehicleId]types.Millisecond
 
 	intersectionLogVehiclesArrive map[types.Second]int
-	intersectionLogVehiclesLeave map[types.Second]int
-
+	intersectionLogVehiclesLeave  map[types.Second]int
+	simulationDurationSeconds            float64
+	vehiclesFinishedThroughput		int
 }
 
 
@@ -175,11 +180,13 @@ func (f *ResultsLogger) appendToVehicleLog(step int, id types.VehicleId, speed t
 }
 
 func (f *ResultsLogger) sendInfoLog() {
+	throughput := int(float64(f.vehiclesFinishedThroughput) * 60 / f.simulationDurationSeconds) // per minute - hence "* 60"
 	msg := map[string]string {
 		"simulation_name": f.simulationName,
 		"simulation_started_ts": fmt.Sprintf("%d", f.simulationStartTime.Second()),
 		"simulation_finished_ts": fmt.Sprintf("%d", f.simulationFinishTime.Second()),
 		"simulation_max_ts": fmt.Sprintf("%d", f.maxTs),
+		"throughput": fmt.Sprintf("%d", throughput),
 	}
 
 	err := f.logger.Post(infoTag, msg); if err != nil { panic(err) }

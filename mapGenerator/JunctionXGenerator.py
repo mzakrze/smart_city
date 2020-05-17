@@ -2,7 +2,7 @@ import math
 
 
 class Config:
-    INTERSECTION_APPROACH_LENGTH = 100  # [meters]
+    INTERSECTION_APPROACH_LENGTH = 50  # [meters]
     LANE_WIDTH = 3  # [meters]
 
 # Układ odniesienia:

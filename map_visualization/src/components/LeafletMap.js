@@ -21,11 +21,8 @@ class LeafletMap extends React.Component{
         this.cacheRefillingPing = false;
         this.cacheRefillingPong = false;
         this.simulationTimeOffset_ms = null;
-        // TODO - moze bedzie trezba parametryzować pingPongDuration
 
         this.elasticsearchFacade = new ElasticsearchFacade();
-
-        this.startSimulationTS = null;
 
         this.runningSimulationRev = null;
         this.startSimulationRev = null;
@@ -62,7 +59,7 @@ class LeafletMap extends React.Component{
                 ctx.stroke();
             },
 
-            renderVehicle: function(ctx, location, size, metersToPixelsX, metersToPixelsY, alpha) {
+            renderVehicle: function(ctx, location, size, metersToPixelsX, metersToPixelsY, alpha, vId) {
                 ctx.fillStyle = 'rgba(255, 0, 60, 1)';
                 let w = size.width * metersToPixelsX;
                 let l = size.length * metersToPixelsY;
@@ -71,6 +68,12 @@ class LeafletMap extends React.Component{
                 let locationCorner = {x: location.x - l/2, y: location.y - w/2};
 
                 // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Transformations
+                if (vId == 3) {
+                    ctx.fillStyle = 'rgba(0, 255, 60, 1)';
+                }
+                if (vId == 5) {
+                    ctx.fillStyle = 'rgba(0, 60, 255, 1)';
+                }
                 ctx.save();
                 ctx.translate(locationCorner.x + l/2, locationCorner.y + w/2);
 
@@ -82,22 +85,11 @@ class LeafletMap extends React.Component{
             },
 
             render: function() {
-                const redrawThrottle_ms = 50; 
-
                 var canvas = this.getCanvas();
                 var ctx = canvas.getContext('2d', { alpha: false });
 
                 // clear canvas
                 ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-                {
-                    // debug drawing
-                    var point = this._map.latLngToContainerPoint(new L.LatLng(52.218994864793, 21.011712029573467));
-                    this.renderCircle(ctx, point, (1.0 + Math.sin(Date.now()*0.001))*100);
-
-
-
-                }
 
                 if (that.runningSimulationRev != that.startSimulationRev) {
                     // TODO - narazie restart nie działa (tylko start)
@@ -175,7 +167,7 @@ class LeafletMap extends React.Component{
                         // TODO - new L.LatLng można robić przed włożeniem do cache
                         let point = this._map.latLngToContainerPoint(new L.LatLng(p.lat, p.lon));
                         let size = that.vehicleIdToSizeMap[vehicle_id];
-                        this.renderVehicle(ctx, point, size, METERS_TO_PIXELS_X, METERS_TO_PIXELS_Y, p.alpha);
+                        this.renderVehicle(ctx, point, size, METERS_TO_PIXELS_X, METERS_TO_PIXELS_Y, p.alpha, vehicle_id);
                     }
 
                 }
@@ -344,20 +336,6 @@ const GraphPlotLayer = L.CanvasLayer.extend({
             let n = this.theGraph.nodes[nId]
             let {x, y} = this._map.latLngToContainerPoint(new L.LatLng(n.lat, n.lon));
             nodes[nId] = {x, y}
-            // if (n.isEntryPoint) {
-            //     ctx.fillStyle = "#00ff00";
-            //     ctx.fillRect(x - 5, y - 5, 10, 10);
-            // } else if (n.isExitPoint) {
-            //     ctx.fillStyle = "#ff0000";
-            //     ctx.fillRect(x-5, y-5, 10, 10);
-            // }
-            //
-
-            if (n.isEntryPoint && n.wayId == 4) {
-                ctx.fillStyle = "#ff0000";
-                ctx.fillRect(x-5, y-5, 10, 10);
-            }
-
         }
 
         const canvas_arrow = (context, fromx, fromy, tox, toy) => {

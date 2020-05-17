@@ -21,3 +21,8 @@ type LocationStruct struct {
 	Lat Latitude
 	Lon Longitude
 }
+
+type Location struct {
+	X XCoord
+	Y YCoord
+}

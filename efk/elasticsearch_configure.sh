@@ -37,8 +37,9 @@ echo
 echo
 
 
-curl -X PUT "localhost:9200/simulation-vehicle" -H 'Content-Type: application/json' -d'
+curl -X PUT "localhost:9200/_template/simulation-vehicle-template" -H 'Content-Type: application/json' -d'
 {
+    "index_patterns": ["simulation-vehicle"],
     "settings": {
         "number_of_shards": 1,
         "number_of_replicas": 0
@@ -81,8 +82,9 @@ echo
 echo
 
 
-curl -X PUT "localhost:9200/simulation-info" -H 'Content-Type: application/json' -d'
+curl -X PUT "localhost:9200/_template/simulation-info-template" -H 'Content-Type: application/json' -d'
 {
+    "index_patterns": ["simulation-info"],
     "settings": {
         "number_of_shards": 1,
         "number_of_replicas": 0
@@ -92,6 +94,9 @@ curl -X PUT "localhost:9200/simulation-info" -H 'Content-Type: application/json'
         "properties": {
             "simulation_name": {
                 "type": "keyword"
+            },
+            "throughput": {
+                "type": "integer"
             },
             "simulation_started_ts": {
                 "type": "date",
@@ -107,10 +112,7 @@ curl -X PUT "localhost:9200/simulation-info" -H 'Content-Type: application/json'
             "config_raw": {
                 "type": "text"
             },
-            "map_nodes": {
-                "type": "text"
-            },
-            "map_edges": {
+            "graph_raw": {
                 "type": "text"
             }
         }
@@ -124,8 +126,9 @@ echo
 echo
 
 
-curl -X PUT "localhost:9200/simulation-intersection" -H 'Content-Type: application/json' -d'
+curl -X PUT "localhost:9200/_template/simulation-intersection-template" -H 'Content-Type: application/json' -d'
 {
+    "index_patterns": ["simulation-intersection"],
     "settings": {
         "number_of_shards": 1,
         "number_of_replicas": 0
@@ -158,8 +161,9 @@ echo
 
 
 
-curl -X PUT "localhost:9200/simulation-vehiclestep" -H 'Content-Type: application/json' -d'
+curl -X PUT "localhost:9200/_template/simulation-vehiclestep-template" -H 'Content-Type: application/json' -d'
 {
+    "index_patterns": ["simulation-vehiclestep"],
     "settings": {
         "number_of_shards": 1,
         "number_of_replicas": 0
@@ -191,4 +195,3 @@ curl -X PUT "localhost:9200/simulation-vehiclestep" -H 'Content-Type: applicatio
 echo
 echo
 echo
-

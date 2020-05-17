@@ -45,6 +45,7 @@ type Edge struct {
 	Id types.EdgeId
 	From *Node
 	To *Node
+	IsArc bool
 	Length types.Meter
 }
 
@@ -163,11 +164,11 @@ func ReadGraph(simName string) (*Graph, error) {
 		t := idToPointer[types.NodeId(e.To)]
 		x := f.X - t.X
 		y := f.Y - t.Y
-		//ee :=
 		f.EdgesFrom = append(f.EdgesFrom, &Edge{
 			Id: types.EdgeId(eId),
 			From: f,
 			To: t,
+			IsArc: e.Arc,
 			Length: math.Sqrt(x * x + y * y),
 		})
 		eId += 1

@@ -2,58 +2,88 @@ package vehicle
 
 import (
 	"algorithm2.0/constants"
+	"algorithm2.0/types"
+	"algorithm2.0/util"
 	"math"
 )
 
-const MaxDistanceMeasurment = 100.0
+const MaxDistanceMeasurement = 50.0
 
-func SensorLayerSingleton(proxy *AllVehicleProxy) *SensorLayer {
+func SensorLayerSingleton(proxy *AllVehicleProxy, graph *util.Graph) *SensorLayer {
+
 	if instanceSensor == nil {
-		instanceSensor = &SensorLayer{proxy: proxy}
+		instanceSensor = &SensorLayer{proxy: proxy, graph: graph}
 	}
 	return instanceSensor
 }
 
-
 func (sensor *SensorLayer) ScanVehiclesAhead (vehicle *VehicleActor) float64 {
-	// aktualna implementacja zaklada że pojazd porusza się pod kątem 0, albo 90, albo 180, albo 270
+	const measurementPrecision = 0.1
 
+	stepX := 0.0
+	stepY := 0.0
+	offsetX := 0.0
+	offsetY := 0.0
+	switch vehicle.Alpha {
+	case -math.Pi / 2: // up
+		stepY = measurementPrecision
+		offsetX = constants.VehicleWidth
+		offsetY = constants.VehicleLength
+	case math.Pi / 2: // down
+		stepY = -measurementPrecision
+		offsetX = constants.VehicleWidth
+		offsetY = constants.VehicleLength
+	case 0: // right
+		stepX = measurementPrecision
+		offsetX = constants.VehicleLength
+		offsetY = constants.VehicleWidth
+	case math.Pi: // left
+		stepX = -measurementPrecision
+		offsetX = constants.VehicleLength
+		offsetY = constants.VehicleWidth
+	default:
+		panic("Illegal sensor query")
+	}
+
+	var collidedWith *VehicleActor = nil
+	collides := func (x, y types.Meter) bool {
+		vehicles := sensor.proxy.GetAllVehicles()
+		for i, v := range vehicles {
+			if v.Id == vehicle.Id {
+				continue
+			}
+			if v.X - offsetX <= x && x <= v.X + offsetX &&
+				v.Y - offsetY <= y && y <= v.Y + offsetY {
+				collidedWith = vehicles[i]
+				return true
+			}
+		}
+		return false
+	}
+
+	x := vehicle.X
+	y := vehicle.Y
+	for step := 1; step < MaxDistanceMeasurement / measurementPrecision ; step += 1 {
+		x += stepX
+		y += stepY
+		if collides(x, y) {
+			res := math.Sqrt((vehicle.X - x) * (vehicle.X - x) + (vehicle.Y - y) * (vehicle.Y - y))
+			res -= constants.VehicleLength / 2
+			res -= math.Sin(collidedWith.Alpha) * constants.VehicleWidth / 2
+
+			if res < 0.0 {
+				return 0.0 // FIXME - lekki hack - w powyższym jest drobny błąd - źle wyliczana jest odległość w zależności od kąta pojazdu, z którym sie zderza
+				//panic("oops")
+			}
+			return res
+		}
+	}
+	return MaxDistanceMeasurement
+}
+
+
+func (sensor *SensorLayer) ScanVehiclesAhead_old (vehicle *VehicleActor) float64 {
 	var getDist func (actor *VehicleActor) float64 = nil
-
-	//switch vehicle.Alpha {
-	//case math.Pi / 2: // riding down
-	//	getDist = func(other *VehicleActor) float64 {
-	//		if vehicle.X == other.X && other.Y < vehicle.Y {
-	//			return vehicle.Y - other.Y
-	//		}
-	//		return MaxDistanceMeasurment
-	//	}
-	//case -math.Pi / 2: // riding up
-	//	getDist = func(other *VehicleActor) float64 {
-	//		if vehicle.X == other.X && other.Y > vehicle.Y {
-	//			return other.Y - vehicle.Y
-	//		}
-	//		return MaxDistanceMeasurment
-	//	}
-	//case 0: // riding right
-	//	getDist = func(other *VehicleActor) float64 {
-	//		if vehicle.Y == other.Y && other.X > vehicle.X {
-	//			return other.X - vehicle.X
-	//		}
-	//		return MaxDistanceMeasurment
-	//	}
-	//case -math.Pi: // riding left
-	//	getDist = func(other *VehicleActor) float64 {
-	//		if vehicle.Y == other.Y && other.X < vehicle.X {
-	//			return vehicle.X - other.X
-	//		}
-	//		return MaxDistanceMeasurment
-	//	}
-	//default:
-	//	// FIXME
-	//	fmt.Printf("Warning: scaning doesnt work: %f\n", vehicle.Alpha)
-	//	return MaxDistanceMeasurment
-	//}
 
 	x := vehicle.X - vehicle.EdgeAt.To.X
 	y := vehicle.Y - vehicle.EdgeAt.To.Y
@@ -62,18 +92,18 @@ func (sensor *SensorLayer) ScanVehiclesAhead (vehicle *VehicleActor) float64 {
 
 	getDist = func (actor *VehicleActor) float64 {
 		if vehicle.EdgeAt.Id != actor.EdgeAt.Id {
-			return MaxDistanceMeasurment
+			return MaxDistanceMeasurement
 		}
 		x1 := actor.X - actor.EdgeAt.To.X
-		y1 := actor.Y- actor.EdgeAt.To.Y
+		y1 := actor.Y - actor.EdgeAt.To.Y
 		d1 := math.Sqrt(x1 * x1 + y1 * y1)
 		if d < d1 {
-			return MaxDistanceMeasurment
+			return MaxDistanceMeasurement
 		}
 		return d - d1 - constants.VehicleLength
 	}
 
-	closest := MaxDistanceMeasurment
+	closest := MaxDistanceMeasurement
 	for _, v := range sensor.proxy.GetAllVehicles() {
 		if v.Id != vehicle.Id {
 			closest = math.Min(getDist(v), closest)
@@ -86,4 +116,6 @@ func (sensor *SensorLayer) ScanVehiclesAhead (vehicle *VehicleActor) float64 {
 var instanceSensor *SensorLayer = nil
 type SensorLayer struct {
 	proxy *AllVehicleProxy
+	graph *util.Graph
 }
+

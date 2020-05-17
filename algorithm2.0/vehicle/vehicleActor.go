@@ -10,11 +10,15 @@ import (
 
 type vehicleState = int
 const (
-	beforeIntersectionNoPermission = 1 + iota
-	beforeIntersectionHasPermission
+	beforeIntersectionNotAllowed = 1 + iota
+	beforeIntersectionHasReservation
 	atIntersection
 	afterIntersection
 )
+
+const maxAcc = 2.0
+const maxDecel = 3.5
+const maxSpeed = 10.0
 
 type VehicleActor struct {
 	Id          types.VehicleId
@@ -26,32 +30,41 @@ type VehicleActor struct {
 	Acc         types.MetersPerSecond2
 	HasFinished bool
 
-	entryPoint  *util.Node
-	exitPoint   *util.Node
-	roadGraph *util.Graph
-	route     []*util.Edge
-	//breakingPidController *PIDController TODO
-	sensor      *SensorLayer
-	state       vehicleState
-	networkCard *CommunicationLayer
+	entryPoint                     *util.Node
+	exitPoint                      *util.Node
+	roadGraph                      *util.Graph
+	route                          []*util.Edge
+	sensor                         *SensorLayer
+	state                          vehicleState
+	networkCard                    *CommunicationLayer
+	reservation                    *reservation
+	AlphaInitiated                 bool
 }
 
-func NewVehicleActor(id types.VehicleId, entrypoint, exitpoint *util.Node, initSpeed types.MetersPerSecond, roadGraph *util.Graph, sensor *SensorLayer, comm *CommunicationLayer) *VehicleActor {
+type reservation struct {
+	arriveConflictZoneTs types.Millisecond
+	arriveConflictZoneSpeed types.MetersPerSecond
+	leaveConflictZoneTs types.Millisecond
+	locationPerTime map[types.Millisecond]types.Location
+}
+
+func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitpoint *util.Node, initSpeed types.MetersPerSecond, roadGraph *util.Graph, sensor *SensorLayer, comm *CommunicationLayer) *VehicleActor {
 	v := VehicleActor{
-		Id: id,
-		X: entrypoint.X,
-		Y: entrypoint.Y,
-		entryPoint: entrypoint,
-		exitPoint: exitpoint,
-		EdgeAt: entrypoint.EdgesFrom[0],
-		Speed: 10.0,
-		Alpha: 0.0,
-		Acc: 0.0,
-		HasFinished: false,
-		roadGraph: roadGraph,
-		sensor: sensor,
-		state: beforeIntersectionNoPermission,
-		networkCard: comm,
+		Id:             id,
+		X:              entrypoint.X,
+		Y:              entrypoint.Y,
+		entryPoint:     entrypoint,
+		exitPoint:      exitpoint,
+		EdgeAt:         entrypoint.EdgesFrom[0],
+		Speed:          initSpeed,
+		Alpha:          0.0,
+		AlphaInitiated: false,
+		Acc:            0.0,
+		HasFinished:    false,
+		roadGraph:      roadGraph,
+		sensor:         sensor,
+		state:          beforeIntersectionNotAllowed,
+		networkCard:    comm,
 	}
 
 	v.planRoute()
@@ -62,126 +75,129 @@ func NewVehicleActor(id types.VehicleId, entrypoint, exitpoint *util.Node, initS
 func (v *VehicleActor) Ping(ts types.Millisecond) {
 	v.handleMessages()
 
-	switch v.state {
-	case beforeIntersectionNoPermission:
-		v.sendRequestPermission(ts)
-	case beforeIntersectionHasPermission:
-		panic("not implemented")
-	case atIntersection:
-		panic("not implemented")
-	case afterIntersection:
-		panic("not implemented")
-	}
-
-	//if math.IsNaN(acc) {
-	//	fmt.Println("oops")
-	//}
-	//if math.IsInf(acc, 1) {
-	//	fmt.Println("oops")
-	//}
-	//if math.IsInf(acc, -1) {
-	//	fmt.Println("oops")
-	//}
-
 	v.Acc = v.calcAcceleration(ts)
 	v.Speed += v.Acc * float64(constants.SimulationStepInterval) / 1000.0
-
-	//if v.Speed == 0 {
-	//	fmt.Println("0 speed")
-	//}
-
-	if math.IsInf(v.Speed, -1) {
-		fmt.Println("oops")
+	if v.Speed > maxSpeed {
+		//panic("xd")
+	}
+	if v.Speed < 0.0 {
+		panic("xd")
 	}
 
 	dist := v.Speed * float64(constants.SimulationStepInterval) / 1000.0
 	v.move(dist)
 
-	switch v.state {
-	case beforeIntersectionHasPermission:
-		if v.isInConflictZone() {
-			v.state = atIntersection
-		}
-	case atIntersection:
-		if v.isInConflictZone() == false {
-			v.state = afterIntersection
-		}
-	}
+	v.sendMessages(ts)
+
+	v.updateState()
 }
 
 func (v *VehicleActor) calcAcceleration(ts types.Millisecond) float64 {
-	switch v.state {
-	case beforeIntersectionNoPermission:
-		d1 := v.calculateDistanceToConflictZone()
-		d2 := v.sensor.ScanVehiclesAhead(v)
-		fmt.Println(d2)
-		d := math.Min(d1, d2)
-		//d -= constants.VehicleLength / 2
-		// TODO - docelowo - użyj pid controllera żeby dostosować, tymczasoso - wyhamuj do 0
-		//if d < 0.0 {
-		//	panic("xd")
-		//}
-		if d == 0 {
+	moderate := func (decel float64) float64 {
+		vdiff := decel * float64(constants.SimulationStepInterval) / 1000.0
+		if v.Speed + vdiff < 0.0 {
+			//decelModerated := brakingDecel(v.Speed, constants.SimulationStepInterval)
+			//if math.Abs(decel) < math.Abs(decelModerated) {
+			//	panic("oops")
+			//}
+			//return decelModerated
+			// FIXME:
+			v.Speed = 0.0 // hack (powyższe nie dziala (blad przy operacjach na liczbach zmiennoprzecinkowych, dlatego narazie hack)
 			return 0.0
 		}
-		//if 0.0 < d && d < 1.0 {
-		//	return 0.0
-		//}
-		if d <= 1.0 {
-			// dopasowujemy tak, żeby w tym kroku wyhamował
-			t := float64(constants.SimulationStepInterval) / 1000.0 // [s]
-			acc := -1 * v.Speed / t
-			//acc := -math.Sqrt(2.0 * d / (t * t))
+		return decel
+	}
+	switch v.state {
+	case beforeIntersectionNotAllowed:
+		d1 := v.calculateDistanceToConflictZone()
+		d2 := v.sensor.ScanVehiclesAhead(v)
+		d := math.Min(d1, d2)
 
-			if math.IsInf(acc, -1) {
-				fmt.Println("oops")
+		if d < 0.0 {
+			panic("Oops - vehicle crashed")
+		}
+
+		const maxComfortableDecel = 1.0
+		distToStartBraking := v.Speed * v.Speed / (2.0 * maxComfortableDecel)
+		distToStartEmergencyBreaking := v.Speed * v.Speed / (2.0 * maxDecel) + 1.0
+		if d <= distToStartEmergencyBreaking {
+			return moderate(-maxDecel)
+		}
+		if d <= distToStartBraking {
+			return moderate(-maxComfortableDecel)
+		}
+		if d > 1.0 && v.Speed <= maxSpeed {
+			return 1.0
+		}
+		return 0.0
+	case beforeIntersectionHasReservation:
+		if v.reservation == nil {
+			panic("oops")
+		}
+		desiredSpeed := v.reservation.arriveConflictZoneSpeed
+		timeLeft := v.reservation.arriveConflictZoneTs - ts
+		d := v.calculateDistanceToConflictZone()
+		if v.Speed == desiredSpeed {
+			if d0 := float64(v.Speed) * float64(timeLeft); d != d0  {
+				panic(fmt.Sprintf("Vehicle missed it reservation: shoudl be %f, is: %f", d, d0))
+			}
+		}
+		deltaV := 2.0 / float64(constants.SimulationStepInterval)
+		if v.Speed + deltaV <= desiredSpeed  {
+			return 2.0
+		} else if v.Speed < desiredSpeed {
+			diff := desiredSpeed - v.Speed
+			acc := diff / float64(constants.SimulationStepInterval)
+			if acc > 2.0 {
+				panic("oops")
 			}
 			return acc
 		} else {
-			return 0.0
+			panic("oops")
 		}
-	case beforeIntersectionHasPermission:
-		// TODO - docelowo - użyj pid controllera, tymczasoswo
-		fallthrough
 	case atIntersection:
-		panic("not implemented")
-		// TODO - docelowo - użyj pid controllera, tymczasoswo
 		if v.Speed < 10 {
-			diff := 10.0 - v.Speed
-			acc := diff * 1000.0
+			diff := 10.0 - v.Speed // [m/s]
+			acc := diff * 1000.0 / 10
 			return acc
 		} else if v.Speed == 10 {
-			// nothing
+			return 0.0
 		} else {
-			panic("to much speed")
+			//panic("to much speed")
+			return 0.0
+		}
+	case afterIntersection:
+		maxAcc := 2.0
+		deltaV := maxAcc * float64(constants.SimulationStepInterval)
+		if v.Speed > maxSpeed {
+			//panic("oops")
+			return 0.0
+		} else if v.Speed == 0 {
+			return 0.0
+		} else {
+			if v.Speed + deltaV <= 10.0 {
+				return maxAcc
+			} else {
+				diff := 10.0 - v.Speed
+				acc := diff / float64(constants.SimulationStepInterval)
+				if acc > 2.0 { panic("oops") }
+				return acc
+			}
 		}
 	default:
 		panic("Illegal state")
 	}
-
-	panic("illegal state")
 }
 
 func (v *VehicleActor) move(distSpare types.Meter) {
-
 	if distSpare == 0.0 {
 		return
 	}
 
 	if len(v.route) == 0 {
-		switch v.Alpha {
-		case math.Pi / 2: // riding down
-			v.Y -= distSpare
-		case -math.Pi / 2: // riding up
-			v.Y += distSpare
-		case 0: // riding right
-			v.X += distSpare
-		case -math.Pi: // riding left
-			v.X -= distSpare
-		default:
-			panic("vehicle cant know where to ride")
-		}
-
+		v.HasFinished = true
+		v.X -= math.Cos(math.Pi - v.Alpha) * distSpare
+		v.Y -= math.Cos(math.Pi / 2 - v.Alpha) * distSpare
 		return
 	}
 
@@ -226,13 +242,19 @@ func (v *VehicleActor) move(distSpare types.Meter) {
 
 	v.X += moveX
 	v.Y += moveY
-	v.Alpha = math.Atan(-moveY / moveX)
-	if v.Alpha == -0 {
-		v.Alpha = -math.Pi
+	switch {
+	case moveX == 0 && moveY > 0: // up
+		v.Alpha = -math.Pi / 2
+	case moveX == 0 && moveY < 0: // down
+		v.Alpha = math.Pi / 2
+	case moveY == 0 && moveX > 0: // right
+		v.Alpha = 0
+	case moveY == 0 && moveX < 0: // left
+		v.Alpha = math.Pi
+	default:
+		v.Alpha = math.Atan(-moveY / moveX)
 	}
-	if math.IsNaN(v.Alpha) {
-		panic("Alpha is NaN")
-	}
+	v.AlphaInitiated = true
 }
 
 func (v *VehicleActor) isInConflictZone() bool {
@@ -258,7 +280,6 @@ func (v *VehicleActor) planRoute() {
 		}
 
 		return false
-
 	}
 
 	res := visit(v.entryPoint)
@@ -272,14 +293,50 @@ func (v *VehicleActor) planRoute() {
 
 func (v *VehicleActor) sendRequestPermission(ts types.Millisecond) {
 	d := v.sensor.ScanVehiclesAhead(v)
-	isFirst := d >= MaxDistanceMeasurment
+	isFirst := d >= MaxDistanceMeasurement
+	if isFirst == false {
+		return
+	}
+
+	toConflictZone := v.calculateDistanceToConflictZone()
+	if toConflictZone < 0 {
+		panic("oops")
+	}
+	tdiff := types.Millisecond(1000 * toConflictZone / 10)
+
+	approachConflictZoneTs := ts+tdiff
+
+	conflictZoneLength := 0.0
+	for _, r := range v.route {
+		if r.IsArc {
+			conflictZoneLength += r.Length
+		}
+	}
+	conflictZoneLength += constants.VehicleLength
+	duration := conflictZoneLength / 10.0 * 1000.0
+	leaveConflictZoneTs := ts + tdiff + types.Millisecond(duration)
+
+	t := (math.Sqrt(v.Speed * v.Speed + 2 * maxAcc * toConflictZone) - v.Speed) / 2.0
+	deltaV := maxAcc * t
+	approachConflictZoneSpeedMax := v.Speed + deltaV
+	approachConflictZoneSpeedMax = math.Min(approachConflictZoneSpeedMax, 10.0)
+
+	if math.IsNaN(approachConflictZoneSpeedMax) {
+		fmt.Println("oops")
+	}
+
+	t = (math.Sqrt(v.Speed * v.Speed + 2 * maxDecel * toConflictZone) - v.Speed) / 2.0
+	deltaV = maxDecel * t
+	approachConflictZoneSpeedMin := v.Speed - deltaV
 
 	m := DsrcV2RMessage{
 		MsgType:               AimProtocolMsgRequest,
 		Sender:                v.Id,
 		TsSent:                ts,
-		IsFirstOnIntersection: isFirst,
-		VehicleInFrontId:      0, // TODO
+		ApproachConflictZoneTs: approachConflictZoneTs,
+		LeaveConflictZoneTs: 	leaveConflictZoneTs,
+		ApproachConflictZoneSpeedMax: approachConflictZoneSpeedMax,
+		ApproachConflictZoneSpeedMin: approachConflictZoneSpeedMin,
 		X:                     v.X,
 		Y:                     v.Y,
 		Speed:                 v.Speed,
@@ -290,7 +347,22 @@ func (v *VehicleActor) sendRequestPermission(ts types.Millisecond) {
 }
 
 func (v *VehicleActor) handleMessages() {
-	v.networkCard.VehicleReceive(v.Id)
+	messages := v.networkCard.VehicleReceive(v.Id)
+	for _, m := range messages {
+		if m.msgType == AimProtocolMsgAllow {
+			if v.state == beforeIntersectionNotAllowed {
+				v.state = beforeIntersectionHasReservation
+			}
+			reservation := reservation{
+				arriveConflictZoneTs: m.reservationFromTs,
+				arriveConflictZoneSpeed: m.reservationDesiredSpeed,
+				leaveConflictZoneTs: m.reservationToTs,
+				// TODO - locationPerTime
+				//:locationPerTime map[types.Millisecond]types.Location
+			}
+			v.reservation = &reservation
+		}
+	}
 }
 
 func (v *VehicleActor) calculateDistanceToConflictZone() float64 {
@@ -302,9 +374,42 @@ func (v *VehicleActor) calculateDistanceToConflictZone() float64 {
 	} else if c.MinY < v.Y && v.Y < c.MaxY {
 		r = math.Min(math.Abs(v.X - c.MaxX), math.Abs(v.X - c.MinX))
 	} else {
-		panic("xD")
+		panic("Illegal location of vehicle")
 	}
 
 	// what interests us is the whole not it's center point, hence minus half of length
 	return r - constants.VehicleLength / 2
+}
+
+func (v *VehicleActor) sendMessages(ts types.Millisecond) {
+	switch v.state {
+	case beforeIntersectionNotAllowed:
+		if v.AlphaInitiated == false {
+			panic("Sending request before initiating alpha")
+		}
+		v.sendRequestPermission(ts)
+	case beforeIntersectionHasReservation:
+		// nothing
+	case atIntersection:
+		// nothing
+	case afterIntersection:
+		// nothing
+	}
+}
+
+func (v *VehicleActor) updateState() {
+	switch v.state {
+	case beforeIntersectionNotAllowed:
+		if v.isInConflictZone() {
+			panic("Entered conflict zone without reservation")
+		}
+	case beforeIntersectionHasReservation:
+		if v.isInConflictZone() {
+			v.state = atIntersection
+		}
+	case atIntersection:
+		if v.isInConflictZone() == false {
+			v.state = afterIntersection
+		}
+	}
 }

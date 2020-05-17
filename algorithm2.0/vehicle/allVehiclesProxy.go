@@ -31,7 +31,12 @@ func (p*AllVehicleProxy) GetAllVehicles() []*VehicleActor {
 }
 
 func (p *AllVehicleProxy) AllVehiclesDone() bool {
-	return true // TODO
+	for _, v := range p.registeredVehicles {
+		if v.HasFinished == false {
+			return false
+		}
+	}
+	return true
 }
 
 
