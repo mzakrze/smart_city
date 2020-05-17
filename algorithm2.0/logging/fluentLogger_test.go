@@ -91,7 +91,7 @@ func TestFluentLoggerUnit(t *testing.T) {
 	loggerMock := &resultLoggerMock{t: t}
 
 	// given
-	fluentLogger := ResultsLoggerSingleton(loggerMock, mapWidth, mapHeight, 10)
+	fluentLogger := ResultsLoggerSingleton(loggerMock, mapWidth, mapHeight)
 
 	// when
 	fluentLogger.SimulationStarted(simName, startTime)

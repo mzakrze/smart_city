@@ -182,7 +182,7 @@ class JunctionXGenerator:
             x = i_x + mArr[lane]
             y = i_y + Config.LANE_WIDTH * lanes * 2
             n_u_i = {"x": x, "y": y}
-            n_u_e = {"x": x, "y": self.map_height}
+            n_u_e = {"x": x, "y": self.map_height, "wayId": 1}
             generate_id(n_u_i, n_u_e)
             nodes = nodes + [n_u_i, n_u_e]
             if exitpoint:
@@ -199,7 +199,7 @@ class JunctionXGenerator:
             x = i_x - mArr[lane]
             y = i_y - Config.LANE_WIDTH * lanes * 2
             n_d_i = {"x": x, "y": y}
-            n_d_e = {"x": x, "y": 0, entrypoint: entrypoint, exitpoint: exitpoint}
+            n_d_e = {"x": x, "y": 0, "wayId": 2}
             generate_id(n_d_i, n_d_e)
             nodes = nodes + [n_d_i, n_d_e]
             if exitpoint:
@@ -216,7 +216,7 @@ class JunctionXGenerator:
             x = i_x + Config.LANE_WIDTH * lanes * 2
             y = i_y - mArr[lane]
             n_r_i = {"x": x, "y": y}
-            n_r_e = {"x": self.map_width, "y": y, entrypoint: entrypoint, exitpoint: exitpoint}
+            n_r_e = {"x": self.map_width, "y": y, "wayId": 3}
             generate_id(n_r_i, n_r_e)
             nodes = nodes + [n_r_i, n_r_e]
             if exitpoint:
@@ -233,7 +233,7 @@ class JunctionXGenerator:
             x = i_x - Config.LANE_WIDTH * lanes * 2
             y = i_y + mArr[lane]
             n_l_i = {"x": x, "y": y}
-            n_l_e = {"x": 0, "y": y, entrypoint: entrypoint, exitpoint: exitpoint}
+            n_l_e = {"x": 0, "y": y, "wayId": 4}
             generate_id(n_l_i, n_l_e)
             nodes = nodes + [n_l_i, n_l_e]
             if exitpoint:
@@ -291,11 +291,11 @@ class JunctionXGenerator:
 
         self.fix_nodes_ids(nodes, edges)
 
-        intersection_manager = {
-            "bboxUp": self.intersection_center["y"] + Config.LANE_WIDTH * lanes * 2,
-            "bboxDown": self.intersection_center["y"] - Config.LANE_WIDTH * lanes * 2,
-            "bboxLeft": self.intersection_center["x"] - Config.LANE_WIDTH * lanes * 2,
-            "bboxRight": self.intersection_center["x"] + Config.LANE_WIDTH * lanes * 2,
+        conflict_zone = {
+            "maxY": self.intersection_center["y"] + Config.LANE_WIDTH * lanes * 2,
+            "minY": self.intersection_center["y"] - Config.LANE_WIDTH * lanes * 2,
+            "minX": self.intersection_center["x"] - Config.LANE_WIDTH * lanes * 2,
+            "maxX": self.intersection_center["x"] + Config.LANE_WIDTH * lanes * 2,
         }
 
         return {
@@ -303,7 +303,7 @@ class JunctionXGenerator:
             "edges": edges,
             "mapWidth": self.map_width,
             "mapHeight": self.map_height,
-            "im": intersection_manager,
+            "conflictZone": conflict_zone,
         }
 
     def fix_nodes_ids(self, nodes, edges):

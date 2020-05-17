@@ -26,7 +26,9 @@ type IResultLogger interface {
 	Post(tag string, msg interface{}) error
 }
 
-func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Meter, simulationStep types.Millisecond) *ResultsLogger {
+func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Meter) *ResultsLogger {
+	const simulationStep = types.Millisecond(10)
+
 	// Let's assume that simulation area is small enough to calculate as if Earth is flat
 	maxLat, maxLon := calculateMaxLatMaxLon(mapWidth, mapHeight)
 	yToLat := func(y types.YCoord) types.Latitude {

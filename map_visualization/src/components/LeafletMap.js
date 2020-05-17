@@ -195,9 +195,9 @@ class LeafletMap extends React.Component{
         this.graphPlotLayer
             .addTo(this.map);
 
-        this.roadPlotLayer = new LeafletRoadPlotLayer();
-        this.roadPlotLayer
-            .addTo(this.map);
+        // this.roadPlotLayer = new LeafletRoadPlotLayer();
+        // this.roadPlotLayer
+        //     .addTo(this.map);
 
         var scale = L.control.scale({
             metric: true,
@@ -233,13 +233,13 @@ class LeafletMap extends React.Component{
 
                 const graph = { nodes, edges }
                 that.graphPlotLayer.initGraphPlotLayer(graph)
-                that.roadPlotLayer.initRoadPlotLayer(graph)
+                // that.roadPlotLayer.initRoadPlotLayer(graph)
             })
 
         const overlayers = {
             "vehicles": this.simulationVisualizationLayer,
             "Graph": this.graphPlotLayer,
-            "Road": this.roadPlotLayer,
+            // "Road": this.roadPlotLayer,
         };
         const baseLayers = { };
         L.control.layers(baseLayers, overlayers).addTo(this.map);
@@ -344,8 +344,20 @@ const GraphPlotLayer = L.CanvasLayer.extend({
             let n = this.theGraph.nodes[nId]
             let {x, y} = this._map.latLngToContainerPoint(new L.LatLng(n.lat, n.lon));
             nodes[nId] = {x, y}
-            ctx.fillStyle = "#000000";
-            ctx.fillRect(x-1, y-1, 2, 2);
+            // if (n.isEntryPoint) {
+            //     ctx.fillStyle = "#00ff00";
+            //     ctx.fillRect(x - 5, y - 5, 10, 10);
+            // } else if (n.isExitPoint) {
+            //     ctx.fillStyle = "#ff0000";
+            //     ctx.fillRect(x-5, y-5, 10, 10);
+            // }
+            //
+
+            if (n.isEntryPoint && n.wayId == 4) {
+                ctx.fillStyle = "#ff0000";
+                ctx.fillRect(x-5, y-5, 10, 10);
+            }
+
         }
 
         const canvas_arrow = (context, fromx, fromy, tox, toy) => {

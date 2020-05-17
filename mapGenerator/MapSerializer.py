@@ -25,7 +25,7 @@ class MapSerializer:
 
         meta = {
             "graph": bbox,
-            "im": graph["im"],
+            "conflictZone": graph["conflictZone"],
         }
 
         self.add_coords(bbox, graph)

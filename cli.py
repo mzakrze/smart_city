@@ -57,7 +57,7 @@ def parse_config(path):
 
 
 def insert_to_elastic(name, graph_raw, config_raw):
-    url = 'http://localhost:9200/simulation-infoxd/_doc/' + name
+    url = 'http://localhost:9200/simulation-info/_doc/' + name
     myobj = {'simulation_name': name, "graph_raw": graph_raw, "config_raw": config_raw}
 
     requests.post(url, data=json.dumps(myobj), headers={'Content-Type': 'application/json; charset=UTF-8'})
@@ -66,7 +66,7 @@ def insert_to_elastic(name, graph_raw, config_raw):
 
 
 def validate_name(name):
-    url = 'http://localhost:9200/simulation-infoxd/_doc/' + name
+    url = 'http://localhost:9200/simulation-info/_doc/' + name
     r = requests.get(url)
 
     if r.status_code != 404:
@@ -83,10 +83,10 @@ if __name__ == "__main__":
     map_raw_json = generate_map_json("junction_x", config.map_lanes)
     insert_to_elastic(name, map_raw_json, config_raw)
 
-    print("Running simulation ...")
-
-    os.chdir("algorithm2.0")
-    os.system("go run main.go")
+    # print("Running simulation ...")
+    #
+    # os.chdir("algorithm2.0")
+    # os.system("go run main.go")
 
 
 

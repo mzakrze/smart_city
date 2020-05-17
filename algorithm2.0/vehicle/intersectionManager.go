@@ -3,7 +3,6 @@ package vehicle
 import (
 	"algorithm2.0/types"
 	"algorithm2.0/vehicle/intersection_policies"
-	"algorithm2.0/vehicle_communication"
 )
 
 type IntersectionPolicy interface {
@@ -12,17 +11,19 @@ type IntersectionPolicy interface {
 
 var instance *IntersectionManager = nil
 type IntersectionManager struct {
-	networkCard *vehicle_communication.CommunicationLayer
+	networkCard *CommunicationLayer
 	policy *IntersectionPolicy
 }
 
-func IntersectionManagerSingleton(networkCard *vehicle_communication.CommunicationLayer, intersectionPolicyId string) (*IntersectionManager, error) {
+func IntersectionManagerSingleton(networkCard *CommunicationLayer, intersectionPolicyId string) (*IntersectionManager, error) {
 	if instance == nil {
 		var policy IntersectionPolicy
 		// TODO - use reflection to create instance (add method to IntersectionPolicy returing code)
 		switch intersectionPolicyId {
 		case "sequential":
 			policy = &intersection_policies.IntersectionPolicySequential{}
+		default:
+			panic("Illegal name of intersection policy")
 		}
 
 		instance = &IntersectionManager{networkCard: networkCard, policy: &policy}
@@ -32,7 +33,7 @@ func IntersectionManagerSingleton(networkCard *vehicle_communication.Communicati
 }
 
 func (im *IntersectionManager) Ping(ts types.Millisecond) {
-
+	im.networkCard.IntersectionManagerReceive()
 }
 
 

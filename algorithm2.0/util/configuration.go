@@ -12,7 +12,6 @@ type Configuration struct {
 	VehiclesPerMinute int32
 	IntersectionPolicy string
 	SimulationDuration time.Duration
-	StepInterval types.Millisecond
 	VehicleMaxAcc types.MetersPerSecond2
 	VehicleMaxDecel types.MetersPerSecond2
 	VehicleMaxSpeed types.MetersPerSecond
@@ -21,5 +20,15 @@ type Configuration struct {
 
 
 func ReadConfiguration() (Configuration, error) {
-	return Configuration{}, nil
+	// TODO mocked
+	d, _ := time.ParseDuration("60s")
+	return Configuration{
+		SimulationName: "test1",
+		VehiclesPerMinute: 60,
+		IntersectionPolicy: "sequential",
+		SimulationDuration: d,
+		VehicleMaxSpeed: 10,
+		VehicleMaxAcc: 2.0,
+		VehicleMaxDecel: 3.5,
+	}, nil
 }

@@ -7,8 +7,8 @@ class TripIndexFacade {
     async getVehicleIdToSizeMap() {
 
         let res = {}
-        for (let i = 0; i < 100; i++) {
-            res[i + ""] = {width: 2, length: 4}
+        for (let i = 0; i < 100000; i++) {
+            res[i + ""] = {width: 1.9, length: 4.124}
         }
 
         return res
