@@ -20,6 +20,7 @@ const maxAcc = 2.0
 const maxDecel = 3.5
 const maxSpeed = 10.0
 
+// TODO - docelowo wszystko prywatne - tylko jakiś Getter do stanu
 type VehicleActor struct {
 	Id          types.VehicleId
 	X           types.XCoord
@@ -29,16 +30,16 @@ type VehicleActor struct {
 	Speed       types.MetersPerSecond
 	Acc         types.MetersPerSecond2
 	HasFinished bool
+	State          vehicleState
 
-	entryPoint                     *util.Node
-	exitPoint                      *util.Node
-	roadGraph                      *util.Graph
-	route                          []*util.Edge
-	sensor                         *SensorLayer
-	state                          vehicleState
-	networkCard                    *CommunicationLayer
-	reservation                    *reservation
-	AlphaInitiated                 bool
+	entryPoint     *util.Node
+	exitPoint      *util.Node
+	roadGraph      *util.Graph
+	route          []*util.Edge
+	sensor         *SensorLayer
+	networkCard    *CommunicationLayer
+	reservation    *reservation
+	AlphaInitiated bool
 }
 
 type reservation struct {
@@ -63,7 +64,7 @@ func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitp
 		HasFinished:    false,
 		roadGraph:      roadGraph,
 		sensor:         sensor,
-		state:          beforeIntersectionNotAllowed,
+		State:          beforeIntersectionNotAllowed,
 		networkCard:    comm,
 	}
 
@@ -107,7 +108,7 @@ func (v *VehicleActor) calcAcceleration(ts types.Millisecond) float64 {
 		}
 		return decel
 	}
-	switch v.state {
+	switch v.State {
 	case beforeIntersectionNotAllowed:
 		d1 := v.calculateDistanceToConflictZone()
 		d2 := v.sensor.ScanVehiclesAhead(v)
@@ -185,7 +186,7 @@ func (v *VehicleActor) calcAcceleration(ts types.Millisecond) float64 {
 			}
 		}
 	default:
-		panic("Illegal state")
+		panic("Illegal State")
 	}
 }
 
@@ -350,8 +351,8 @@ func (v *VehicleActor) handleMessages() {
 	messages := v.networkCard.VehicleReceive(v.Id)
 	for _, m := range messages {
 		if m.msgType == AimProtocolMsgAllow {
-			if v.state == beforeIntersectionNotAllowed {
-				v.state = beforeIntersectionHasReservation
+			if v.State == beforeIntersectionNotAllowed {
+				v.State = beforeIntersectionHasReservation
 			}
 			reservation := reservation{
 				arriveConflictZoneTs: m.reservationFromTs,
@@ -382,7 +383,7 @@ func (v *VehicleActor) calculateDistanceToConflictZone() float64 {
 }
 
 func (v *VehicleActor) sendMessages(ts types.Millisecond) {
-	switch v.state {
+	switch v.State {
 	case beforeIntersectionNotAllowed:
 		if v.AlphaInitiated == false {
 			panic("Sending request before initiating alpha")
@@ -398,18 +399,18 @@ func (v *VehicleActor) sendMessages(ts types.Millisecond) {
 }
 
 func (v *VehicleActor) updateState() {
-	switch v.state {
+	switch v.State {
 	case beforeIntersectionNotAllowed:
 		if v.isInConflictZone() {
 			panic("Entered conflict zone without reservation")
 		}
 	case beforeIntersectionHasReservation:
 		if v.isInConflictZone() {
-			v.state = atIntersection
+			v.State = atIntersection
 		}
 	case atIntersection:
 		if v.isInConflictZone() == false {
-			v.state = afterIntersection
+			v.State = afterIntersection
 		}
 	}
 }

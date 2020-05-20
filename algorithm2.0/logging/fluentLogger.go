@@ -48,6 +48,7 @@ func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Mete
 			currentSecond: 0,
 			mapLogLocation: make(map[types.VehicleId][]types.LocationStruct),
 			mapLogAlpha: make(map[types.VehicleId][]types.Angle),
+			mapLogState: make(map[types.VehicleId][]int),
 			vehicleLogSpeed: make(map[types.VehicleId][]types.MetersPerSecond),
 			vehicleLogAcc: make(map[types.VehicleId][]types.MetersPerSecond2),
 			vehicleLogArrive: make(map[types.VehicleId]types.Millisecond),
@@ -69,7 +70,7 @@ func (f *ResultsLogger) SimulationFinished(finishTime time.Time) {
 	f.sendIntersectionLog()
 }
 
-func (f *ResultsLogger) VehicleStepReport(id types.VehicleId, ts types.Millisecond, x types.XCoord, y types.YCoord, alpha types.Angle, speed types.MetersPerSecond, acc types.MetersPerSecond2) {
+func (f *ResultsLogger) VehicleStepReport(id types.VehicleId, ts types.Millisecond, x types.XCoord, y types.YCoord, alpha types.Angle, speed types.MetersPerSecond, acc types.MetersPerSecond2, state int) {
 	f.maxTs = int(math.Max(float64(ts), float64(f.maxTs)))
 
 	if ts % 100 == 0 {
@@ -84,7 +85,7 @@ func (f *ResultsLogger) VehicleStepReport(id types.VehicleId, ts types.Milliseco
 		f.intersectionLogVehiclesLeave[f.currentSecond] = 0
 	}
 
-	f.appendToMapLog(stepInSecond, id, x, y, alpha)
+	f.appendToMapLog(stepInSecond, id, x, y, alpha, state)
 	f.appendToVehicleLog(stepInSecond, id, speed, acc)
 
 	if ts % 1000 == 990 {
@@ -123,6 +124,7 @@ type ResultsLogger struct {
 
 	mapLogLocation map[types.VehicleId][]types.LocationStruct
 	mapLogAlpha    map[types.VehicleId][]types.Angle
+	mapLogState    map[types.VehicleId][]int
 
 	vehicleLogSpeed  map[types.VehicleId][]types.MetersPerSecond
 	vehicleLogAcc    map[types.VehicleId][]types.MetersPerSecond2
@@ -131,7 +133,7 @@ type ResultsLogger struct {
 	intersectionLogVehiclesArrive map[types.Second]int
 	intersectionLogVehiclesLeave  map[types.Second]int
 	simulationDurationSeconds            float64
-	vehiclesFinishedThroughput		int
+	vehiclesFinishedThroughput			int
 }
 
 
@@ -148,7 +150,7 @@ type ResultsLogger struct {
 
 
 func calculateMaxLatMaxLon(x types.Meter, y types.Meter) (float64, float64) {
-	// chttps://stackoverflow.com/questions/7477003/calculating-new-longitude-latitude-from-old-n-meters
+	// https://stackoverflow.com/questions/7477003/calculating-new-longitude-latitude-from-old-n-meters
 	const earth = 6378.137 //radius of the earth in kilometer
 	const m = (1.0 / ((2.0 * math.Pi / 360.0) * earth)) / 1000
 
@@ -160,14 +162,16 @@ func calculateMaxLatMaxLon(x types.Meter, y types.Meter) (float64, float64) {
 
 
 
-func (f *ResultsLogger) appendToMapLog(step int, id types.VehicleId, x types.XCoord, y types.YCoord, alpha types.Angle) {
+func (f *ResultsLogger) appendToMapLog(step int, id types.VehicleId, x types.XCoord, y types.YCoord, alpha types.Angle, state int) {
 	if _, exists := f.mapLogLocation[id]; exists == false {
 		if step != 0 { panic("Illegal bucket state") }
 		f.mapLogLocation[id] = make([]types.LocationStruct, f.bucketSize)
 		f.mapLogAlpha[id] = make([]types.Angle, f.bucketSize)
+		f.mapLogState[id] = make([]int, f.bucketSize)
 	}
 	f.mapLogLocation[id][step] = types.LocationStruct{Lon: f.xToLon(x), Lat: f.yToLat(y)}
 	f.mapLogAlpha[id][step] = alpha
+	f.mapLogState[id][step] = state
 }
 func (f *ResultsLogger) appendToVehicleLog(step int, id types.VehicleId, speed types.MetersPerSecond, acc types.MetersPerSecond2) {
 	if _, exists := f.vehicleLogSpeed[id]; exists == false {
@@ -195,14 +199,18 @@ func (f *ResultsLogger) sendInfoLog() {
 func (f *ResultsLogger) sendMapLogAndFlush(vId types.VehicleId) {
 	alpha := f.mapLogAlpha[vId]
 	location := f.mapLogLocation[vId]
+	state := f.mapLogState[vId]
 
 	delete(f.mapLogAlpha, vId)
 	delete(f.mapLogLocation, vId)
+	delete(f.mapLogState, vId)
 
 	bytes, err := json.Marshal(location); if err != nil { panic(err) }
 	locationJson := string(bytes)
 	bytesAlpha, err := json.Marshal(alpha); if err != nil { panic(err) }
 	alphaJson := string(bytesAlpha)
+	bytesState, err := json.Marshal(state); if err != nil { panic(err) }
+	stateJson := string(bytesState)
 
 	msg := map[string]string {
 		"simulation_name": f.simulationName,
@@ -210,6 +218,7 @@ func (f *ResultsLogger) sendMapLogAndFlush(vId types.VehicleId) {
 		"second": fmt.Sprintf("%d", f.currentSecond),
 		"location_array": locationJson,
 		"alpha_array": alphaJson,
+		"state_array": stateJson,
 	}
 
 	err = f.logger.Post(mapTag, msg)

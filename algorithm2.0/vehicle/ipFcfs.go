@@ -36,7 +36,7 @@ func (ip * IntersectionPolicyFcfs) ProcessMsg(m DsrcV2RMessage) {
 
 }
 
-func (ip *IntersectionPolicyFcfs) GetReplies() []*DsrcR2VMessage {
+func (ip *IntersectionPolicyFcfs) GetReplies(ts types.Millisecond) []*DsrcR2VMessage {
 	res := ip.replies
 	ip.replies = []*DsrcR2VMessage{}
 	return res

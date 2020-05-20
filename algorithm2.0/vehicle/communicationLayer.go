@@ -32,6 +32,7 @@ type DsrcR2VMessage struct {
 	reservationFromTs       types.Millisecond
 	reservationToTs         types.Millisecond
 	reservationDesiredSpeed types.MetersPerSecond
+	reservationTsToLocation map[types.Millisecond]types.Location
 }
 
 func CommunicationLayerSingleton(proxy *AllVehicleProxy) *CommunicationLayer {

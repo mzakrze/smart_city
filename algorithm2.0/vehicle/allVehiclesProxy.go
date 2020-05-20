@@ -20,7 +20,7 @@ func (p*AllVehicleProxy) UnregisterVehicle(actor *VehicleActor) {
 		}
 	}
 	if index < 0 {
-		panic("Illegal state")
+		panic("Illegal State")
 	}
 
 	p.registeredVehicles = append(p.registeredVehicles[:index], p.registeredVehicles[index + 1:]...)

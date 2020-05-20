@@ -59,7 +59,7 @@ class LeafletMap extends React.Component{
                 ctx.stroke();
             },
 
-            renderVehicle: function(ctx, location, size, metersToPixelsX, metersToPixelsY, alpha, vId) {
+            renderVehicle: function(ctx, location, size, metersToPixelsX, metersToPixelsY, alpha, vId, state) {
                 ctx.fillStyle = 'rgba(255, 0, 60, 1)';
                 let w = size.width * metersToPixelsX;
                 let l = size.length * metersToPixelsY;
@@ -68,12 +68,13 @@ class LeafletMap extends React.Component{
                 let locationCorner = {x: location.x - l/2, y: location.y - w/2};
 
                 // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Transformations
-                if (vId == 3) {
-                    ctx.fillStyle = 'rgba(0, 255, 60, 1)';
+                const stateToColor = {
+                    1: 'rgba(255, 0, 0, 1)',
+                    2: 'rgba(0, 0, 255, 1)',
+                    3: 'rgba(0, 0, 255, 1)',
+                    4: 'rgba(255, 0, 0, 1)',
                 }
-                if (vId == 5) {
-                    ctx.fillStyle = 'rgba(0, 60, 255, 1)';
-                }
+                ctx.fillStyle = stateToColor[state]
                 ctx.save();
                 ctx.translate(locationCorner.x + l/2, locationCorner.y + w/2);
 
@@ -167,7 +168,7 @@ class LeafletMap extends React.Component{
                         // TODO - new L.LatLng można robić przed włożeniem do cache
                         let point = this._map.latLngToContainerPoint(new L.LatLng(p.lat, p.lon));
                         let size = that.vehicleIdToSizeMap[vehicle_id];
-                        this.renderVehicle(ctx, point, size, METERS_TO_PIXELS_X, METERS_TO_PIXELS_Y, p.alpha, vehicle_id);
+                        this.renderVehicle(ctx, point, size, METERS_TO_PIXELS_X, METERS_TO_PIXELS_Y, p.alpha, vehicle_id, p.state);
                     }
 
                 }

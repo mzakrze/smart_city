@@ -78,6 +78,7 @@ class ElasticsearchFacade {
                 // TODO - może lepiej robić to w ES - będzie wydajniej
                 for (let index in result[r._source.vehicle_id]) {
                     result[r._source.vehicle_id][index].alpha = r._source.alpha_array[index]
+                    result[r._source.vehicle_id][index].state = r._source.state_array[index]
                 }
             }
             if (res.hits.total > sizeParam) {

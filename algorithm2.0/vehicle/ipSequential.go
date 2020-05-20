@@ -6,7 +6,6 @@ import (
 
 type IntersectionPolicySequential struct {
 	nextAvailableTs types.Millisecond
-	bestOffer *DsrcR2VMessage
 	winningRequest *DsrcV2RMessage
 
 	vehicleToFirstRequestTs map[types.VehicleId]types.Millisecond
@@ -15,7 +14,6 @@ type IntersectionPolicySequential struct {
 func CreateIntersectionPolicySequential() *IntersectionPolicySequential {
 	return &IntersectionPolicySequential{
 		nextAvailableTs: 0,
-		bestOffer: nil,
 		winningRequest: nil,
 		vehicleToFirstRequestTs: make(map[types.VehicleId]types.Millisecond),
 	}
@@ -30,40 +28,46 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
 		return
 	}
 
-	from := m.ApproachConflictZoneTs
-	to := m.LeaveConflictZoneTs
-
-	if ip.bestOffer != nil && ip.evaluateRequest(ip.winningRequest) > ip.evaluateRequest(&m) {
+	if ip.winningRequest != nil && ip.scoreRequest(ip.winningRequest) > ip.scoreRequest(&m) {
 		return
 	}
 
-	ip.nextAvailableTs = to
-
-	reply := DsrcR2VMessage{
-		msgType: AimProtocolMsgAllow,
-		receiver: m.Sender,
-		reservationFromTs: from,
-		reservationToTs: to,
-		reservationDesiredSpeed: m.ApproachConflictZoneSpeedMax,
-	}
-
-	ip.bestOffer = &reply
 	ip.winningRequest = &m
 }
 
-func (ip *IntersectionPolicySequential) GetReplies() []*DsrcR2VMessage {
-	if ip.bestOffer == nil {
+func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*DsrcR2VMessage {
+	if ip.nextAvailableTs - ts > 0 {
+		// we still have time to make a decision
 		return []*DsrcR2VMessage{}
 	}
-	res := []*DsrcR2VMessage{ip.bestOffer}
-	ip.bestOffer = nil
+	if ip.winningRequest == nil {
+		return []*DsrcR2VMessage{}
+	}
+
+	req := ip.winningRequest
+	offer := &DsrcR2VMessage{
+		msgType: AimProtocolMsgAllow,
+		receiver: req.Sender,
+		reservationFromTs: req.ApproachConflictZoneTs,
+		reservationToTs: req.LeaveConflictZoneTs,
+		reservationDesiredSpeed: req.ApproachConflictZoneSpeedMax,
+	}
+
+	ip.nextAvailableTs = req.LeaveConflictZoneTs
+
+	res := []*DsrcR2VMessage{offer}
+	ip.winningRequest = nil
 	return res
 }
 
-func (ip *IntersectionPolicySequential) evaluateRequest(message *DsrcV2RMessage) float64 {
+/**
+The higher, the better (IP will more likely grant reservation)
+ */
+func (ip *IntersectionPolicySequential) scoreRequest(message *DsrcV2RMessage) float64 {
 	res := 0.0
 
-	res -= 10.0 * float64(message.ApproachConflictZoneTs)
+	// punishment for late arrival
+	res -= float64(message.ApproachConflictZoneTs)
 
 	//res += float64(ip.vehicleToFirstRequestTs[message.Sender])
 

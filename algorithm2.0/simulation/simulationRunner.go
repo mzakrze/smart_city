@@ -85,7 +85,7 @@ func (r *SimulationRunner) RunSimulation() {
 
 		for _, v := range r.allVehiclesProxy.GetAllVehicles() {
 			v.Ping(ts)
-			r.resultsLogger.VehicleStepReport(v.Id, ts, v.X, v.Y, v.Alpha, v.Speed, v.Acc)
+			r.resultsLogger.VehicleStepReport(v.Id, ts, v.X, v.Y, v.Alpha, v.Speed, v.Acc, v.State)
 		}
 
 		r.im.Ping(ts)

@@ -7,7 +7,7 @@ import (
 
 type IntersectionPolicy interface {
 	ProcessMsg(message DsrcV2RMessage)
-	GetReplies() []*DsrcR2VMessage
+	GetReplies(millisecond types.Millisecond) []*DsrcR2VMessage
 }
 
 var instance *IntersectionManager = nil
@@ -49,7 +49,7 @@ func (im *IntersectionManager) Ping(ts types.Millisecond) {
 
 	}
 
-	replies := im.policy.GetReplies()
+	replies := im.policy.GetReplies(ts)
 	for _, r := range replies {
 		r.tsSent = ts
 		im.networkCard.SendDsrcR2V(*r)

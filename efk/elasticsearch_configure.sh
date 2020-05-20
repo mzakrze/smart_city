@@ -25,6 +25,9 @@ curl -X PUT "localhost:9200/simulation-map" -H 'Content-Type: application/json' 
             },
             "alpha_array": {
                 "type": "float"
+            },
+            "state_array": {
+                "type": "float"
             }
         }
     }
