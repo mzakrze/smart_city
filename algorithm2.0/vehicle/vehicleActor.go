@@ -44,6 +44,7 @@ type VehicleActor struct {
 }
 
 type reservation struct {
+	reservationId		types.ReservationId
 	arriveConflictZoneTs types.Millisecond
 	arriveConflictZoneSpeed types.MetersPerSecond
 	leaveConflictZoneTs types.Millisecond
@@ -75,7 +76,7 @@ func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitp
 }
 
 func (v *VehicleActor) Ping(ts types.Millisecond) {
-	v.handleMessages()
+	v.handleMessages(ts)
 
 	v.Acc = v.calcAcceleration(ts)
 	v.Speed += v.Acc * float64(constants.SimulationStepInterval) / 1000.0
@@ -91,7 +92,7 @@ func (v *VehicleActor) Ping(ts types.Millisecond) {
 
 	v.sendMessages(ts)
 
-	v.updateState()
+	v.updateState(ts)
 }
 
 func (v *VehicleActor) calcAcceleration(ts types.Millisecond) float64 {
@@ -111,7 +112,7 @@ func (v *VehicleActor) calcAcceleration(ts types.Millisecond) float64 {
 	}
 	switch v.State {
 	case beforeIntersectionNotAllowed:
-		d1 := v.calculateDistanceToConflictZone()
+		d1 := v.calculateDistanceCenterToConflictZone() - constants.VehicleLength / 2
 		d2 := v.sensor.ScanVehiclesAhead(v)
 		d := math.Min(d1, d2)
 
@@ -136,13 +137,15 @@ func (v *VehicleActor) calcAcceleration(ts types.Millisecond) float64 {
 		if v.reservation == nil {
 			panic("oops")
 		}
+
 		desiredSpeed := v.reservation.arriveConflictZoneSpeed
 		timeLeft := v.reservation.arriveConflictZoneTs - ts
-		d := v.calculateDistanceToConflictZone()
+		d := v.calculateDistanceCenterToConflictZone()
 		if v.Speed == desiredSpeed {
-			if d0 := float64(v.Speed) * float64(timeLeft); d != d0  {
-				panic(fmt.Sprintf("Vehicle missed it reservation: shoudl be %f, is: %f", d, d0))
+			if d0 := float64(v.Speed) * float64(timeLeft) / 1000.0; d != d0 {
+				//panic(fmt.Sprintf("Vehicle missed it reservation: shoudl be %f, is: %f", d, d0))
 			}
+			return 0.0
 		}
 		deltaV := 2.0 / float64(constants.SimulationStepInterval)
 		if v.Speed + deltaV <= desiredSpeed  {
@@ -150,10 +153,9 @@ func (v *VehicleActor) calcAcceleration(ts types.Millisecond) float64 {
 		} else if v.Speed < desiredSpeed {
 			diff := desiredSpeed - v.Speed
 			acc := diff / float64(constants.SimulationStepInterval)
-			if acc > 2.0 {
-				panic("oops")
-			}
-			return acc
+			if acc > 2.0 { panic("oops") }
+			v.Speed = desiredSpeed // FIXME - hack
+			return 0.0
 		} else {
 			panic("oops")
 		}
@@ -259,7 +261,7 @@ func (v *VehicleActor) move(distSpare types.Meter) {
 	v.AlphaInitiated = true
 }
 
-func (v *VehicleActor) isInConflictZone() bool {
+func (v *VehicleActor) isCenterInConflictZone() bool {
 	c := &v.roadGraph.ConflictZone
 	return c.MinY <= v.Y && v.Y <= c.MaxY && c.MinX <= v.X && v.X <= c.MaxX
 }
@@ -300,7 +302,7 @@ func (v *VehicleActor) sendRequestPermission(ts types.Millisecond) {
 		return
 	}
 
-	toConflictZone := v.calculateDistanceToConflictZone()
+	toConflictZone := v.calculateDistanceCenterToConflictZone()
 	if toConflictZone < 0 {
 		panic("oops")
 	}
@@ -321,6 +323,10 @@ func (v *VehicleActor) sendRequestPermission(ts types.Millisecond) {
 		tdiff = arrivalTimeAcceleratingEnterWithSpeed(v.Speed, maxSpeed, maxAcc, maxDecel, toConflictZone, maxSpeedOnCurve)
 	} else {
 		tdiff = arrivalTimeAccelerating(v.Speed, maxSpeed, maxAcc, toConflictZone)
+	}
+
+	if v.Id == 0 {
+		fmt.Println("TDiff = ", tdiff)
 	}
 
 	approachConflictZoneSpeedMax = math.Min(maxSpeedOnCurve, math.Min(approachConflictZoneSpeedMax, 10.0))
@@ -369,10 +375,27 @@ func (v *VehicleActor) sendRequestPermission(ts types.Millisecond) {
 	v.networkCard.SendDsrcV2R(m)
 }
 
-func (v *VehicleActor) handleMessages() {
+func (v *VehicleActor) handleMessages(ts types.Millisecond) {
 	messages := v.networkCard.VehicleReceive(v.Id)
 	for _, m := range messages {
 		if m.msgType == AimProtocolMsgAllow {
+
+			// TODO - sprawdzic czy dam rade dojechać, jak nie - anulować
+
+			d := v.calculateDistanceCenterToConflictZone()
+
+			canArriveAt := ts + arrivalTimeAccelerating(v.Speed, maxSpeed, maxAcc, d)
+
+			if canArriveAt > m.reservationFromTs {
+				reply := DsrcV2RMessage{
+					MsgType: AimProtocolMsgReservationCancelation,
+					ReservationId: m.reservationId,
+				}
+				// TODO - troche hack bo w innym momencie powinny byc wysyłane requesty
+				v.networkCard.SendDsrcV2R(reply)
+				continue
+			}
+
 			if v.State == beforeIntersectionNotAllowed {
 				v.State = beforeIntersectionHasReservation
 			}
@@ -387,7 +410,7 @@ func (v *VehicleActor) handleMessages() {
 	}
 }
 
-func (v *VehicleActor) calculateDistanceToConflictZone() float64 {
+func (v *VehicleActor) calculateDistanceCenterToConflictZone() float64 {
 	c := &v.roadGraph.ConflictZone
 
 	var r float64
@@ -399,8 +422,7 @@ func (v *VehicleActor) calculateDistanceToConflictZone() float64 {
 		panic("Illegal location of vehicle")
 	}
 
-	// what interests us is the whole not it's center point, hence minus half of length
-	return r - constants.VehicleLength / 2
+	return r
 }
 
 func (v *VehicleActor) sendMessages(ts types.Millisecond) {
@@ -419,19 +441,25 @@ func (v *VehicleActor) sendMessages(ts types.Millisecond) {
 	}
 }
 
-func (v *VehicleActor) updateState() {
+func (v *VehicleActor) updateState(ts types.Millisecond) {
 	switch v.State {
 	case beforeIntersectionNotAllowed:
-		if v.isInConflictZone() {
+		if v.isCenterInConflictZone() {
 			panic("Entered conflict zone without reservation")
 		}
 	case beforeIntersectionHasReservation:
-		if v.isInConflictZone() {
+		if v.isCenterInConflictZone() {
 			v.State = atIntersection
+
+			if math.Abs(float64(v.reservation.arriveConflictZoneTs - ts)) > 0 {
+				fmt.Println("Vehicle should arrive at:", v.reservation.arriveConflictZoneTs, "but arrived:", ts, "difference =", (ts - v.reservation.arriveConflictZoneTs))
+				//panic("Vehicle missed its reservation")
+			}
 		}
 	case atIntersection:
-		if v.isInConflictZone() == false {
+		if v.isCenterInConflictZone() == false {
 			v.State = afterIntersection
+			// TODO - sprawdzic czy zjechał ze skrzyżowania w czasie
 		}
 	}
 }

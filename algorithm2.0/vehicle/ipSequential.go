@@ -9,11 +9,19 @@ import (
 )
 
 type IntersectionPolicySequential struct {
-	nextAvailableTs types.Millisecond
 	winningRequest  *DsrcV2RMessage
-
 	vehicleToFirstRequestTs map[types.VehicleId]types.Millisecond
 	graph                   *util.Graph
+	nextReservationId		types.ReservationId
+	reservations			[]ipReservation
+
+}
+
+
+type ipReservation struct {
+	from types.Millisecond
+	to types.Millisecond
+	id types.ReservationId
 }
 
 type turnDirection int
@@ -25,19 +33,39 @@ const (
 
 func CreateIntersectionPolicySequential(graph *util.Graph) *IntersectionPolicySequential {
 	return &IntersectionPolicySequential{
-		nextAvailableTs: 0,
 		winningRequest: nil,
 		graph: graph,
+		nextReservationId: 1,
 		vehicleToFirstRequestTs: make(map[types.VehicleId]types.Millisecond),
+		reservations: make([]ipReservation, 0),
 	}
 }
 
 func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
+
+	if m.MsgType == AimProtocolMsgReservationCancelation {
+		index := math.MinInt32
+		for i := range ip.reservations {
+			if ip.reservations[i].id == m.ReservationId {
+				index = i
+			}
+		}
+		if index < 0 {
+			panic("Oops")
+		}
+		fmt.Println("canceling id: ", m.ReservationId)
+		ip.reservations = append(ip.reservations[:index], ip.reservations[index + 1 : ]...)
+
+		return
+	}
+
 	if _, exists := ip.vehicleToFirstRequestTs[m.Sender]; exists == false {
 		ip.vehicleToFirstRequestTs[m.Sender] = m.TsSent
 	}
 
-	if ip.nextAvailableTs >= m.ApproachConflictZoneMinTs {
+	arriveTs, leaveTs, _, _ := ip.calculateRouteForRequest(&m)
+
+	if ip.isReserved(arriveTs, leaveTs) {
 		return
 	}
 
@@ -47,6 +75,7 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
 
 	ip.winningRequest = &m
 }
+
 
 func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*DsrcR2VMessage {
 	//if ip.nextAvailableTs - ts > 0 {
@@ -58,45 +87,27 @@ func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*Dsrc
 	}
 	req := ip.winningRequest
 
-	approachConflictZoneSpeed := req.ApproachConflictZoneSpeedMax
-	approachConflictZoneTs := req.ApproachConflictZoneMinTs
+	arriveTs, leaveTs, arriveSpeed, tsToSpeed := ip.calculateRouteForRequest(req)
 
-	reservationTsToSpeed := make(map[types.Millisecond]types.MetersPerSecond)
-	tsOnIntersection := approachConflictZoneTs
-	speed := approachConflictZoneSpeed
-	accelerateTo := func(limit types.MetersPerSecond) {
-		if speed < limit {
-			speed += maxAcc * (float64(constants.SimulationStepInterval) / 1000.0)
-			if speed > limit {
-				speed = limit
-			}
-		}
-	}
-	distanceInConflictZone := ip.distanceOnConflictZone(req) + constants.VehicleLength
-	for d := types.Meter(0); d < distanceInConflictZone; tsOnIntersection += constants.SimulationStepInterval {
-		reservationTsToSpeed[tsOnIntersection] = speed
-
-		d += speed * (float64(constants.SimulationStepInterval) / 1000.0)
-
-		if req.IsTurning {
-			accelerateTo(req.MaxSpeedOnCurve)
-		} else {
-			accelerateTo(maxSpeed)
-		}
-	}
-	ip.nextAvailableTs = tsOnIntersection
-	fmt.Println(ip.nextAvailableTs)
+	ip.reservations = append(ip.reservations, ipReservation{
+		from: arriveTs,
+		to: leaveTs,
+		id: ip.nextReservationId,
+	})
 
 	offer := &DsrcR2VMessage{
 		msgType: AimProtocolMsgAllow,
 		receiver: req.Sender,
-		reservationFromTs: approachConflictZoneTs,
-		reservationDesiredSpeed: approachConflictZoneSpeed,
-		reservationTsToSpeed: reservationTsToSpeed,
+		reservationFromTs: arriveTs,
+		reservationDesiredSpeed: arriveSpeed,
+		reservationTsToSpeed: tsToSpeed,
+		reservationId: ip.nextReservationId,
 	}
 
-	res := []*DsrcR2VMessage{offer}
 	ip.winningRequest = nil
+	ip.nextReservationId += 1
+
+	res := []*DsrcR2VMessage{offer}
 	return res
 }
 
@@ -168,4 +179,50 @@ func (ip *IntersectionPolicySequential) distanceOnConflictZone(msg *DsrcV2RMessa
 	default:
 		panic("oops")
 	}
+}
+
+func (ip *IntersectionPolicySequential) calculateRouteForRequest(req *DsrcV2RMessage) (types.Millisecond, types.Millisecond, types.MetersPerSecond, map[types.Millisecond]types.MetersPerSecond) {
+	approachConflictZoneSpeed := req.ApproachConflictZoneSpeedMax
+	approachConflictZoneTs := req.ApproachConflictZoneMinTs + constants.SimulationStepInterval
+
+	reservationTsToSpeed := make(map[types.Millisecond]types.MetersPerSecond)
+	tsOnIntersection := approachConflictZoneTs
+	speed := approachConflictZoneSpeed
+	accelerateTo := func(limit types.MetersPerSecond) {
+		if speed < limit {
+			speed += maxAcc * (float64(constants.SimulationStepInterval) / 1000.0)
+			if speed > limit {
+				speed = limit
+			}
+		}
+	}
+	distanceInConflictZone := ip.distanceOnConflictZone(req) + constants.VehicleLength
+	for d := types.Meter(0); d < distanceInConflictZone; tsOnIntersection += constants.SimulationStepInterval {
+		reservationTsToSpeed[tsOnIntersection] = speed
+
+		d += speed * (float64(constants.SimulationStepInterval) / 1000.0)
+
+		if req.IsTurning {
+			accelerateTo(req.MaxSpeedOnCurve)
+		} else {
+			accelerateTo(maxSpeed)
+		}
+	}
+
+
+	return approachConflictZoneTs, tsOnIntersection, approachConflictZoneSpeed, reservationTsToSpeed
+
+}
+
+func (ip *IntersectionPolicySequential) isReserved(from types.Millisecond, to types.Millisecond) bool {
+	for _, r := range ip.reservations {
+		if r.from < from && from < r.to {
+			return true
+		}
+		if r.to < to && to < r.to {
+			return true
+		}
+	}
+
+	return false
 }

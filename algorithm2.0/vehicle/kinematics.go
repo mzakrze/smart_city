@@ -28,6 +28,9 @@ func arrivalTimeAccelerating(v0, vMax types.MetersPerSecond, a types.MetersPerSe
 		t2 := (s * a + 0.5 * v0 * v0 - 0.5 * vMax * vMax) / (vMax * a)
 		if t2 < 0.0 { panic("Oops") }
 
+		sCheck := v0 * t1 + 0.5 * a * t1 * t1 + vMax * t2
+		if math.Abs(sCheck - s) > 0.01 { panic("Oops") }
+
 		return types.Millisecond((t1 + t2) * 1000.0)
 	} else {
 		// na całym odcinku przyspieszamy

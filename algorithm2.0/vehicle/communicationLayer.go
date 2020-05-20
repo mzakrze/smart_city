@@ -9,11 +9,13 @@ import (
 type AimProtocolMessageType = int32
 const (
 	AimProtocolMsgRequest = iota
+	AimProtocolMsgReservationCancelation
 	AimProtocolMsgAllow
 )
 
 type DsrcV2RMessage struct {
 	MsgType                      AimProtocolMessageType
+	ReservationId				 types.ReservationId
 	TsSent                       types.Millisecond
 	Sender                       types.VehicleId
 	VehicleX                     types.XCoord
@@ -31,12 +33,13 @@ type DsrcV2RMessage struct {
 
 type DsrcR2VMessage struct {
 	msgType                 AimProtocolMessageType
+	reservationId           types.ReservationId
 	tsSent                  types.Millisecond
 	receiver                types.VehicleId
 	reservationFromTs       types.Millisecond
 	reservationToTs         types.Millisecond
 	reservationDesiredSpeed types.MetersPerSecond
-	reservationTsToSpeed map[types.Millisecond]types.MetersPerSecond
+	reservationTsToSpeed    map[types.Millisecond]types.MetersPerSecond
 }
 
 func CommunicationLayerSingleton(proxy *AllVehicleProxy) *CommunicationLayer {
