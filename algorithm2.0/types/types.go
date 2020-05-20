@@ -13,6 +13,7 @@ type Meter = float64
 type VehicleId = int32
 type Angle = float64
 type NodeId = int32
+type WayId = int32
 type EdgeId = int32
 type MetersPerSecond = float64
 type MetersPerSecond2 = float64

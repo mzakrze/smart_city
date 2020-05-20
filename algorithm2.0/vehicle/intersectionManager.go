@@ -23,7 +23,7 @@ func IntersectionManagerSingleton(graph *util.Graph, networkCard *CommunicationL
 		// TODO - use reflection to create instance (add method to IntersectionPolicy returing code)
 		switch intersectionPolicyId {
 		case "sequential":
-			policy = CreateIntersectionPolicySequential()
+			policy = CreateIntersectionPolicySequential(graph)
 		case "fcfs":
 			policy = CreateIntersectionPolicyFcfs(graph)
 		default:

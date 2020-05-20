@@ -19,6 +19,7 @@ const (
 const maxAcc = 2.0
 const maxDecel = 3.5
 const maxSpeed = 10.0
+const maxAngularSpeed = 5.0
 
 // TODO - docelowo wszystko prywatne - tylko jakiś Getter do stanu
 type VehicleActor struct {
@@ -46,7 +47,7 @@ type reservation struct {
 	arriveConflictZoneTs types.Millisecond
 	arriveConflictZoneSpeed types.MetersPerSecond
 	leaveConflictZoneTs types.Millisecond
-	locationPerTime map[types.Millisecond]types.Location
+	speedPerTime map[types.Millisecond]types.MetersPerSecond
 }
 
 func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitpoint *util.Node, initSpeed types.MetersPerSecond, roadGraph *util.Graph, sensor *SensorLayer, comm *CommunicationLayer) *VehicleActor {
@@ -303,45 +304,66 @@ func (v *VehicleActor) sendRequestPermission(ts types.Millisecond) {
 	if toConflictZone < 0 {
 		panic("oops")
 	}
-	tdiff := types.Millisecond(1000 * toConflictZone / 10)
 
-	approachConflictZoneTs := ts+tdiff
 
-	conflictZoneLength := 0.0
-	for _, r := range v.route {
-		if r.IsArc {
-			conflictZoneLength += r.Length
-		}
-	}
-	conflictZoneLength += constants.VehicleLength
-	duration := conflictZoneLength / 10.0 * 1000.0
-	leaveConflictZoneTs := ts + tdiff + types.Millisecond(duration)
+	var tdiff types.Millisecond
+	var maxSpeedOnCurve types.MetersPerSecond = math.MaxFloat64
+	var approachConflictZoneSpeedMax types.MetersPerSecond
 
 	t := (math.Sqrt(v.Speed * v.Speed + 2 * maxAcc * toConflictZone) - v.Speed) / 2.0
 	deltaV := maxAcc * t
-	approachConflictZoneSpeedMax := v.Speed + deltaV
-	approachConflictZoneSpeedMax = math.Min(approachConflictZoneSpeedMax, 10.0)
+	approachConflictZoneSpeedMax = v.Speed + deltaV
+
+	if v.isTurning() {
+		radius := math.Abs(v.entryPoint.X - v.exitPoint.X)
+		maxSpeedOnCurve = 2.0 * math.Pi * math.Sqrt(maxAngularSpeed * radius)
+
+		tdiff = arrivalTimeAcceleratingEnterWithSpeed(v.Speed, maxSpeed, maxAcc, maxDecel, toConflictZone, maxSpeedOnCurve)
+	} else {
+		tdiff = arrivalTimeAccelerating(v.Speed, maxSpeed, maxAcc, toConflictZone)
+	}
+
+	approachConflictZoneSpeedMax = math.Min(maxSpeedOnCurve, math.Min(approachConflictZoneSpeedMax, 10.0))
+	approachConflictZoneMinTs := ts+tdiff
 
 	if math.IsNaN(approachConflictZoneSpeedMax) {
 		fmt.Println("oops")
 	}
 
-	t = (math.Sqrt(v.Speed * v.Speed + 2 * maxDecel * toConflictZone) - v.Speed) / 2.0
-	deltaV = maxDecel * t
-	approachConflictZoneSpeedMin := v.Speed - deltaV
+	var conflictZoneNodeEnter, conflictZoneNodeExit *util.Node
+	conflictZoneNodeEnter = v.route[0].To
+	if v.isTurning() {
+		for i := 1; i < len(v.route); i += 1 {
+			if v.route[i].IsArc == false {
+				break
+			}
+			conflictZoneNodeExit = v.route[i].To
+		}
+		if conflictZoneNodeExit == nil {
+			panic("Oops")
+		}
+	} else {
+		if len(v.route) != 3 {
+			panic("Oops")
+		}
+		conflictZoneNodeExit = v.route[1].To
+	}
 
 	m := DsrcV2RMessage{
-		MsgType:               AimProtocolMsgRequest,
-		Sender:                v.Id,
-		TsSent:                ts,
-		ApproachConflictZoneTs: approachConflictZoneTs,
-		LeaveConflictZoneTs: 	leaveConflictZoneTs,
+		MsgType:                      AimProtocolMsgRequest,
+		Sender:                       v.Id,
+		TsSent:                       ts,
+		ApproachConflictZoneMinTs:    approachConflictZoneMinTs,
 		ApproachConflictZoneSpeedMax: approachConflictZoneSpeedMax,
-		ApproachConflictZoneSpeedMin: approachConflictZoneSpeedMin,
-		X:                     v.X,
-		Y:                     v.Y,
-		Speed:                 v.Speed,
-		Acc:                   v.Acc,
+		MaxSpeedOnCurve:			  maxSpeedOnCurve,
+		IsTurning:					  v.isTurning(),
+		EntryPointId:                 v.entryPoint.Id,
+		ExitPointId:                  v.exitPoint.Id,
+		ConflictZoneNodeEnter:		  conflictZoneNodeEnter,
+		ConflictZoneNodeExit:		  conflictZoneNodeExit,
+		VehicleX:                     v.X,
+		VehicleY:                     v.Y,
+		VehicleSpeed:                 v.Speed,
 	}
 
 	v.networkCard.SendDsrcV2R(m)
@@ -358,8 +380,7 @@ func (v *VehicleActor) handleMessages() {
 				arriveConflictZoneTs: m.reservationFromTs,
 				arriveConflictZoneSpeed: m.reservationDesiredSpeed,
 				leaveConflictZoneTs: m.reservationToTs,
-				// TODO - locationPerTime
-				//:locationPerTime map[types.Millisecond]types.Location
+				speedPerTime: m.reservationTsToSpeed,
 			}
 			v.reservation = &reservation
 		}
@@ -412,5 +433,19 @@ func (v *VehicleActor) updateState() {
 		if v.isInConflictZone() == false {
 			v.State = afterIntersection
 		}
+	}
+}
+
+func (v *VehicleActor) isTurning() bool {
+	diff := v.entryPoint.WayId - v.exitPoint.WayId
+
+	if diff == -1 || diff == 3 {
+		return true
+	} else if diff == 1 || diff == -3 {
+		return true
+	} else if diff == -2 || diff == 2 {
+		return false
+	} else {
+		panic("Illegal way")
 	}
 }

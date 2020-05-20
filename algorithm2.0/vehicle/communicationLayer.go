@@ -2,6 +2,7 @@ package vehicle
 
 import (
 	"algorithm2.0/types"
+	"algorithm2.0/util"
 	"math/rand"
 )
 
@@ -12,17 +13,20 @@ const (
 )
 
 type DsrcV2RMessage struct {
-	MsgType AimProtocolMessageType
-	TsSent types.Millisecond
-	Sender types.VehicleId
-	X types.XCoord
-	Y types.YCoord
-	Speed types.MetersPerSecond
-	Acc types.MetersPerSecond2
-	ApproachConflictZoneTs types.Millisecond
+	MsgType                      AimProtocolMessageType
+	TsSent                       types.Millisecond
+	Sender                       types.VehicleId
+	VehicleX                     types.XCoord
+	VehicleY                     types.YCoord
+	VehicleSpeed                 types.MetersPerSecond
+	ApproachConflictZoneMinTs    types.Millisecond
 	ApproachConflictZoneSpeedMax types.MetersPerSecond
-	ApproachConflictZoneSpeedMin types.MetersPerSecond
-	LeaveConflictZoneTs types.Millisecond
+	ConflictZoneNodeEnter 		 *util.Node
+	ConflictZoneNodeExit 		 *util.Node
+	MaxSpeedOnCurve				 types.MetersPerSecond
+	IsTurning					 bool
+	EntryPointId                 types.NodeId
+	ExitPointId                  types.NodeId
 }
 
 type DsrcR2VMessage struct {
@@ -32,7 +36,7 @@ type DsrcR2VMessage struct {
 	reservationFromTs       types.Millisecond
 	reservationToTs         types.Millisecond
 	reservationDesiredSpeed types.MetersPerSecond
-	reservationTsToLocation map[types.Millisecond]types.Location
+	reservationTsToSpeed map[types.Millisecond]types.MetersPerSecond
 }
 
 func CommunicationLayerSingleton(proxy *AllVehicleProxy) *CommunicationLayer {

@@ -12,6 +12,10 @@ class LeafletMap extends React.Component{
     constructor(props) {
         super(props);
 
+        this.state = {
+            timestamp: 0,
+        }
+
         this.simulationResultCachedPing = null;
         this.simulationResultCachedPong = null;
         this.simulationCurrentSecond = null;
@@ -136,6 +140,9 @@ class LeafletMap extends React.Component{
                         }
 
                         that.simulationCurrentSecond += 1;
+                        that.setState({
+                            timestamp: that.simulationCurrentSecond,
+                        })
                         step -= 1000;
                     }
                     
@@ -307,6 +314,9 @@ class LeafletMap extends React.Component{
     render() {
         return <div style={{display:'inline-block', marginRight:'20px'}}>
             <div id="leaflet-map-id"> </div>
+            <div>
+                <h2>Current timestamp: {this.state.timestamp}</h2>
+            </div>
         </div>;
     }
 }

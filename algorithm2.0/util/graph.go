@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"math"
 
-	//"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 )
@@ -93,11 +91,6 @@ func ReadGraph(simName string) (*Graph, error) {
 	if err != nil {
 		panic(err)
 	}
-	bodyStr := string(body)
-
-	fmt.Println("Body:")
-	fmt.Println(bodyStr)
-	fmt.Println("Body EOF:")
 
 	respObject := struct {
 		Source struct {

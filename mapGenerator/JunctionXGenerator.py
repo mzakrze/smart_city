@@ -199,7 +199,7 @@ class JunctionXGenerator:
             x = i_x - mArr[lane]
             y = i_y - Config.LANE_WIDTH * lanes * 2
             n_d_i = {"x": x, "y": y}
-            n_d_e = {"x": x, "y": 0, "wayId": 2}
+            n_d_e = {"x": x, "y": 0, "wayId": 3}
             generate_id(n_d_i, n_d_e)
             nodes = nodes + [n_d_i, n_d_e]
             if exitpoint:
@@ -216,7 +216,7 @@ class JunctionXGenerator:
             x = i_x + Config.LANE_WIDTH * lanes * 2
             y = i_y - mArr[lane]
             n_r_i = {"x": x, "y": y}
-            n_r_e = {"x": self.map_width, "y": y, "wayId": 3}
+            n_r_e = {"x": self.map_width, "y": y, "wayId": 2}
             generate_id(n_r_i, n_r_e)
             nodes = nodes + [n_r_i, n_r_e]
             if exitpoint:

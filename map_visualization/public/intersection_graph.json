@@ -27,7 +27,7 @@
         {
             "x": 54.5,
             "y": 0,
-            "wayId": 2,
+            "wayId": 3,
             "id": 4,
             "isEntryPoint": true,
             "entryPointId": 0,
@@ -44,7 +44,7 @@
         {
             "x": 106,
             "y": 54.5,
-            "wayId": 3,
+            "wayId": 2,
             "id": 6,
             "isEntryPoint": true,
             "entryPointId": 0,
@@ -95,7 +95,7 @@
         {
             "x": 51.5,
             "y": 0,
-            "wayId": 2,
+            "wayId": 3,
             "id": 12,
             "isExitPoint": true,
             "exitPointId": 0,
@@ -112,7 +112,7 @@
         {
             "x": 106,
             "y": 51.5,
-            "wayId": 3,
+            "wayId": 2,
             "id": 14,
             "isExitPoint": true,
             "exitPointId": 0,
