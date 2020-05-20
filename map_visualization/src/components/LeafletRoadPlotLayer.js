@@ -45,7 +45,7 @@ const LeafletRoadPlotLayer = L.CanvasLayer.extend({
         const METERS_TO_PIXELS_Y = heightPixels / heightMeters;
 
         // clear canvas
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         let w = IMG_SIZE_METERS * METERS_TO_PIXELS_X;
         let l = IMG_SIZE_METERS * METERS_TO_PIXELS_Y;

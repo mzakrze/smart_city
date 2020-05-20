@@ -105,7 +105,7 @@ class JunctionXGenerator:
                     order = False
             else:
                 raise Exception("Illegal quarter argument")
-            STEPS = 10
+            STEPS = 30
             prev = None
             for n in range(1, STEPS):
                 alpha = n / STEPS * 3.1452 / 2

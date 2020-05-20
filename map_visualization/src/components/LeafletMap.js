@@ -187,16 +187,16 @@ class LeafletMap extends React.Component{
             }
         });
 
+        this.roadPlotLayer = new LeafletRoadPlotLayer();
+        this.roadPlotLayer
+            .addTo(this.map);
+
         this.simulationVisualizationLayer = new SimulationVisualizationLayer();
         this.simulationVisualizationLayer
             .addTo(this.map);
 
-        this.graphPlotLayer = new GraphPlotLayer();
-        this.graphPlotLayer
-            .addTo(this.map);
-
-        // this.roadPlotLayer = new LeafletRoadPlotLayer();
-        // this.roadPlotLayer
+        // this.graphPlotLayer = new GraphPlotLayer();
+        // this.graphPlotLayer
         //     .addTo(this.map);
 
         var scale = L.control.scale({
@@ -232,16 +232,17 @@ class LeafletMap extends React.Component{
                 }
 
                 const graph = { nodes, edges }
-                that.graphPlotLayer.initGraphPlotLayer(graph)
-                // that.roadPlotLayer.initRoadPlotLayer(graph)
+                // that.graphPlotLayer.initGraphPlotLayer(graph)
+                that.roadPlotLayer.initRoadPlotLayer(graph)
             })
 
         const overlayers = {
-            "vehicles": this.simulationVisualizationLayer,
-            "Graph": this.graphPlotLayer,
+
+            // "Graph": this.graphPlotLayer,
             // "Road": this.roadPlotLayer,
+            "vehicles": this.simulationVisualizationLayer
         };
-        const baseLayers = { };
+        const baseLayers = { "vehicles": this.simulationVisualizationLayer, "Road": this.roadPlotLayer,};
         L.control.layers(baseLayers, overlayers).addTo(this.map);
     }
 

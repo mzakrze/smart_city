@@ -15,7 +15,7 @@ const (
 
 type DsrcV2RMessage struct {
 	MsgType                      AimProtocolMessageType
-	ReservationId				 types.ReservationId
+	ReservationId                types.ReservationId
 	TsSent                       types.Millisecond
 	Sender                       types.VehicleId
 	VehicleX                     types.XCoord
@@ -23,12 +23,13 @@ type DsrcV2RMessage struct {
 	VehicleSpeed                 types.MetersPerSecond
 	ApproachConflictZoneMinTs    types.Millisecond
 	ApproachConflictZoneSpeedMax types.MetersPerSecond
-	ConflictZoneNodeEnter 		 *util.Node
-	ConflictZoneNodeExit 		 *util.Node
-	MaxSpeedOnCurve				 types.MetersPerSecond
-	IsTurning					 bool
+	ConflictZoneNodeEnter        *util.Node
+	ConflictZoneNodeExit         *util.Node
+	MaxSpeedOnCurve              types.MetersPerSecond
+	IsTurning                    bool
 	EntryPointId                 types.NodeId
 	ExitPointId                  types.NodeId
+	ConflictZoneLengthDebug      types.Meter
 }
 
 type DsrcR2VMessage struct {

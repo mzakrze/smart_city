@@ -4,7 +4,6 @@ import (
 	"algorithm2.0/constants"
 	"algorithm2.0/types"
 	"algorithm2.0/util"
-	"fmt"
 	"math"
 )
 
@@ -53,7 +52,6 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
 		if index < 0 {
 			panic("Oops")
 		}
-		fmt.Println("canceling id: ", m.ReservationId)
 		ip.reservations = append(ip.reservations[:index], ip.reservations[index + 1 : ]...)
 
 		return
@@ -86,8 +84,13 @@ func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*Dsrc
 		return []*DsrcR2VMessage{}
 	}
 	req := ip.winningRequest
+	ip.winningRequest = nil
 
 	arriveTs, leaveTs, arriveSpeed, tsToSpeed := ip.calculateRouteForRequest(req)
+
+	if ip.isReserved(arriveTs, leaveTs) {
+		panic("Sth not ok")
+	}
 
 	ip.reservations = append(ip.reservations, ipReservation{
 		from: arriveTs,
@@ -95,16 +98,17 @@ func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*Dsrc
 		id: ip.nextReservationId,
 	})
 
+	ip.assertReservationsDontOverlap()
+
 	offer := &DsrcR2VMessage{
 		msgType: AimProtocolMsgAllow,
 		receiver: req.Sender,
 		reservationFromTs: arriveTs,
+		reservationToTs: leaveTs,
 		reservationDesiredSpeed: arriveSpeed,
 		reservationTsToSpeed: tsToSpeed,
 		reservationId: ip.nextReservationId,
 	}
-
-	ip.winningRequest = nil
 	ip.nextReservationId += 1
 
 	res := []*DsrcR2VMessage{offer}
@@ -196,7 +200,7 @@ func (ip *IntersectionPolicySequential) calculateRouteForRequest(req *DsrcV2RMes
 			}
 		}
 	}
-	distanceInConflictZone := ip.distanceOnConflictZone(req) + constants.VehicleLength
+	distanceInConflictZone := ip.distanceOnConflictZone(req)
 	for d := types.Meter(0); d < distanceInConflictZone; tsOnIntersection += constants.SimulationStepInterval {
 		reservationTsToSpeed[tsOnIntersection] = speed
 
@@ -209,20 +213,48 @@ func (ip *IntersectionPolicySequential) calculateRouteForRequest(req *DsrcV2RMes
 		}
 	}
 
-
 	return approachConflictZoneTs, tsOnIntersection, approachConflictZoneSpeed, reservationTsToSpeed
-
 }
 
 func (ip *IntersectionPolicySequential) isReserved(from types.Millisecond, to types.Millisecond) bool {
 	for _, r := range ip.reservations {
-		if r.from < from && from < r.to {
+		if r.from <= from && from <= r.to {
 			return true
 		}
-		if r.to < to && to < r.to {
+		if r.from <= to && to <= r.to {
+			return true
+		}
+		if from <= r.from && r.to <= to {
 			return true
 		}
 	}
 
 	return false
+}
+
+func (ip *IntersectionPolicySequential) assertReservationsDontOverlap() {
+
+	uniqueId := make(map[types.ReservationId]bool)
+	for _, r := range ip.reservations {
+		_, exists := uniqueId[r.id]
+		if exists {
+			panic("Id is not unique")
+		}
+		uniqueId[r.id] = true
+	}
+
+	for _, r1 := range ip.reservations {
+		for _, r2 := range ip.reservations {
+			if r1.id == r2.id {
+				continue
+			}
+
+			if r1.from <= r2.from && r2.from <= r1.to {
+				panic("Overlap")
+			}
+			if r1.from <= r2.to && r2.to <= r1.to {
+				panic("Overlap")
+			}
+		}
+	}
 }

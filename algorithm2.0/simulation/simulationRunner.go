@@ -174,7 +174,7 @@ func (r *SimulationRunner) createRandomVehicleIfEntryPointAvailable(ts types.Mil
 	getRandomCompatibleExitpoint := func(entrypoint *util.Node) *util.Node {
 		possibleExitpoints := []*util.Node{}
 		for _, e := range r.graph.Exitpoints {
-			if e.ExitPointId == entrypoint.EntryPointId && e.WayId != entrypoint.WayId && entrypoint.EntryPointId == 0 { // && math.Abs(float64(e.WayId - entrypoint.WayId)) == 1
+			if e.ExitPointId == entrypoint.EntryPointId && e.WayId != entrypoint.WayId {
 				possibleExitpoints = append(possibleExitpoints, e)
 			}
 		}

@@ -5,6 +5,13 @@ import (
 	"math"
 )
 
+
+func roundTimeResult(res types.Millisecond) types.Millisecond {
+	return res - res % 10
+}
+
+
+
 /**
 Pojazd jedzie z prędkością v, zaczyna hamować, a po czasie t zatrzymuje się do zera.
 Jaka była wartość hamowania (w m/s^2)?
@@ -31,10 +38,10 @@ func arrivalTimeAccelerating(v0, vMax types.MetersPerSecond, a types.MetersPerSe
 		sCheck := v0 * t1 + 0.5 * a * t1 * t1 + vMax * t2
 		if math.Abs(sCheck - s) > 0.01 { panic("Oops") }
 
-		return types.Millisecond((t1 + t2) * 1000.0)
+		return roundTimeResult(types.Millisecond((t1 + t2) * 1000.0))
 	} else {
 		// na całym odcinku przyspieszamy
-		return types.Millisecond((math.Sqrt(v0 * v0 + 2 * s * a) - v0) / a * 1000.0)
+		return roundTimeResult(types.Millisecond((math.Sqrt(v0 * v0 + 2 * s * a) - v0) / a * 1000.0))
 	}
 }
 
@@ -47,7 +54,7 @@ func arrivalTimeAcceleratingEnterWithSpeed(v0, vMax types.MetersPerSecond, a, d 
 
 	if v1 < v2 {
 		// caly czas przyspieszamy
-		return types.Millisecond((math.Sqrt(v0 * v0 + 2 * s * a) - v0) / a * 1000.0)
+		return roundTimeResult(types.Millisecond((math.Sqrt(v0 * v0 + 2 * s * a) - v0) / a * 1000.0))
 	} else {
 		// przez czas t1 przyspieszamy, przez czas t2 (możliwe że t2 = 0) jedziemy jednostajnie, przez czas t3 hamujemy
 
@@ -59,7 +66,7 @@ func arrivalTimeAcceleratingEnterWithSpeed(v0, vMax types.MetersPerSecond, a, d 
 			panic("Oops")
 		}
 
-		return types.Millisecond((t1 + t2 + t3) * 1000.0)
+		return roundTimeResult(types.Millisecond((t1 + t2 + t3) * 1000.0))
 	}
 }
 
