@@ -1,6 +1,7 @@
 package vehicle
 
 import (
+	"algorithm2.0/util"
 	"fmt"
 	"image"
 	"image/color"
@@ -11,18 +12,18 @@ import (
 
 func TestReservationTable(t *testing.T) {
 
-	fcfs := CreateIntersectionPolicyFcfs(nil)
+	fcfs := CreateIntersectionPolicyFcfs(nil, util.Configuration{})
 
 	for counter := 0; counter < 100; counter++ {
 
-		fcfs.appendToReservationTable(nil)
+		//fcfs.appendToReservationTable(nil)
 
 		colors := []color.Color{color.Black, color.White}
 		rect := image.Rect(0, 0, fcfs.gridNoX, fcfs.gridNoY)
 		newFrame := image.NewPaletted(rect, colors)
 		for x := range fcfs.reservationTable {
 			for y := range fcfs.reservationTable[x] {
-				if fcfs.reservationTable[x][y] {
+				if fcfs.reservationTable[0][x][y] == taken {
 					for xx := -5; xx < 5; xx++ {
 						for yy := -5; yy < 5; yy++ {
 							if x + xx < 0 || y + yy < 0 {

@@ -51,8 +51,14 @@ W ile czasu (t1 + t2 +t3) pokona dystans s, zakładając, że na końcu odcinka 
 Ile czasu t1 przyspiesza, ile czasu t2 jedzie jednostajnie, ile czasu t3 hamuje?
  */
 func arrivalTimeAcceleratingEnterWithSpeed(v0, vMax types.MetersPerSecond, a, d types.MetersPerSecond2, s types.Meter, v2 types.MetersPerSecond) (types.Millisecond, types.Millisecond, types.Millisecond) {
-	v1 := vAfterAcceleratingOverDistance(v0, a, s)
 
+	if v0 > v2 {
+		// musimy zwolnic
+
+
+	}
+
+	v1 := vAfterAcceleratingOverDistance(v0, a, s)
 	if v1 < v2 {
 		// caly czas przyspieszamy
 		t1 := roundTimeResult(types.Millisecond((math.Sqrt(v0 * v0 + 2 * s * a) - v0) / a * 1000.0))
@@ -79,4 +85,26 @@ Do jakiej prędkości się rozpędzi?
  */
 func vAfterAcceleratingOverDistance(v0 types.MetersPerSecond, a types.MetersPerSecond2, s types.Meter) types.MetersPerSecond {
 	return math.Sqrt(v0 * v0 + 2 * s * a)
+}
+
+
+/**
+Pojazd jedzie z predkoscia v, przyspiesza z wartością a (może być ujemna) przez czas t.
+Ile drogi s pokona przez ten czas, jaką będzie mieć końcową prędkość?
+ */
+func distSpeedAfterGivenTime(ts types.Millisecond, v types.MetersPerSecond, a types.MetersPerSecond2, vMax types.MetersPerSecond) (types.Meter, types.MetersPerSecond) {
+	t := float64(ts) / 1000 // ms -> s
+
+	delta_v := float64(a) / float64(t)
+
+	if v + delta_v <= vMax {
+		s := v * float64(t) + 0.5 * float64(a) * float64(t) * float64(t)
+		return s, v + delta_v
+	} else {
+		// przyspieszamy przez czas t1, potem przez czas t2 jedziemy jednostajnie
+		t1 := float64((vMax - v) / a)
+		t2 := t - t1
+		s := v * float64(t1) + 0.5 * float64(a) * float64(t1) * float64(t1) + vMax * t2
+		return s, vMax
+	}
 }

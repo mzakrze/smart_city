@@ -44,9 +44,6 @@ const LeafletRoadPlotLayer = L.CanvasLayer.extend({
         const METERS_TO_PIXELS_X = widthPixels / widthMeters;
         const METERS_TO_PIXELS_Y = heightPixels / heightMeters;
 
-        // clear canvas
-        // ctx.clearRect(0, 0, canvas.width, canvas.height);
-
         let w = IMG_SIZE_METERS * METERS_TO_PIXELS_X;
         let l = IMG_SIZE_METERS * METERS_TO_PIXELS_Y;
 
@@ -60,10 +57,43 @@ const LeafletRoadPlotLayer = L.CanvasLayer.extend({
 
         const LANE_WIDTH = 3;
         let laneWithPixels = LANE_WIDTH * METERS_TO_PIXELS_X + 2;
-
+        let next = {};
+        let entrypoints = [];
         for (let e of this.theGraph.edges) {
             let nodeFrom = this.theGraph.nodes[e.from]
             let nodeTo = this.theGraph.nodes[e.to]
+
+            let f = this._map.latLngToContainerPoint(new L.LatLng(nodeFrom.lat, nodeFrom.lon))
+            let t = this._map.latLngToContainerPoint(new L.LatLng(nodeTo.lat, nodeTo.lon));
+
+            if (e.arc) {
+                if ((e.from in next) == false) {
+                    next[e.from] = []
+                }
+                next[e.from].push(e.to);
+            } else {
+                entrypoints.push(e.to)
+            }
+
+            ctx.beginPath();
+            ctx.moveTo(f.x, f.y);
+            ctx.lineTo(t.x, t.y);
+            ctx.strokeStyle = "#555555";
+            ctx.lineWidth = laneWithPixels;
+            ctx.stroke()
+
+        }
+
+        let paintIt = (nId) => {
+            let nodeFrom = this.theGraph.nodes[nId]
+            for (let i = 0; i < 5; i++) {
+                nId = next[nId]
+                if (nId == undefined) {
+                    return
+                }
+                nId = nId[0]
+            }
+            let nodeTo = this.theGraph.nodes[nId]
 
             let f = this._map.latLngToContainerPoint(new L.LatLng(nodeFrom.lat, nodeFrom.lon))
             let t = this._map.latLngToContainerPoint(new L.LatLng(nodeTo.lat, nodeTo.lon));
@@ -73,9 +103,18 @@ const LeafletRoadPlotLayer = L.CanvasLayer.extend({
             ctx.lineTo(t.x, t.y);
             ctx.strokeStyle = "#555555";
             ctx.lineWidth = laneWithPixels;
+            console.log("painting")
             ctx.stroke()
-        }
 
+            paintIt(nId)
+        };
+
+        for (let edge of entrypoints) {
+            if (undefined != next[edge]) {
+                paintIt(next[edge][0]);
+                paintIt(next[edge][1]);
+            }
+        }
     }
 });
 

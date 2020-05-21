@@ -42,8 +42,8 @@ func (sensor *SensorLayer) ScanVehiclesAhead (vehicle *VehicleActor) (float64, t
 		offsetX = constants.VehicleLength
 		offsetY = constants.VehicleWidth
 	default:
-		return -1, -1
-		//panic("Illegal sensor query")
+		//return -1, -1
+		panic("Illegal sensor query")
 	}
 
 	var collidedWith *VehicleActor = nil

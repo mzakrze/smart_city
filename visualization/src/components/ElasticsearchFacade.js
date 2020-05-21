@@ -44,12 +44,6 @@ class ElasticsearchFacade {
     }
 
     getResultsForSecondAndBBox(epochSecond, boundBox) {
-        // TODO - przetestować dla innej półkuli niż NE
-        const topLeftLat = boundBox.north;
-        const topLeftLon = boundBox.west;
-        const bottomRightLat = boundBox.south;
-        const bottomRightLon = boundBox.east;
-
         const sizeParam = 10000;
         /*
         Zakładam, że samochód o danym id pojawia się na początku danej sekundy (czyli w timestamp = "*000"), i nie pojawia się "w połowie" sekundu

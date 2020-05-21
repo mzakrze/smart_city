@@ -65,18 +65,14 @@ def insert_to_elastic(name, graph_raw, config_raw):
     time.sleep(1)  # wait for elastic to index data
 
 
-def validate_name(name):
+def delete_old(name):
     url = 'http://localhost:9200/simulation-info/_doc/' + name
-    r = requests.get(url)
-
-    if r.status_code != 404:
-        print("Error: simulation name is taken (try another one, or delete existing simulation)\n\n")
-        exit(1)
+    r = requests.delete(url)
 
 if __name__ == "__main__":
     print("Reading configuration ...")
     config_path, name = read_args()
-    validate_name(name)
+    delete_old(name)
     config, config_raw = parse_config(config_path)
 
     print("Generating map ...")

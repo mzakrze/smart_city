@@ -26,7 +26,7 @@ func main() {
 	communicationLayer := vehicle.CommunicationLayerSingleton(allVehiclesProxy)
 	sensorLayer := vehicle.SensorLayerSingleton(allVehiclesProxy, graph)
 	collisionDetector := vehicle.NewCollisionDetector(allVehiclesProxy)
-	intersectionManager, err := vehicle.IntersectionManagerSingleton(graph, communicationLayer, configuration.IntersectionPolicy); if err != nil { panic(err) }
+	intersectionManager, err := vehicle.IntersectionManagerSingleton(graph, communicationLayer, configuration); if err != nil { panic(err) }
 	fluentLogger, err := fluent.New(fluent.Config{}); if err != nil { panic(err) }; defer fluentLogger.Close()
 	resultLogger := logging.ResultsLoggerSingleton(fluentLogger, graph.MapWidth, graph.MapWidth, configuration.SimulationDuration.Seconds())
 

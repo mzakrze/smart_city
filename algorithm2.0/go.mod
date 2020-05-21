@@ -10,4 +10,5 @@ require (
 	github.com/matryer/is v1.3.0 // indirect
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/tinylib/msgp v1.1.2 // indirect
+	golang.org/x/exp v0.0.0-20200513190911-00229845015e
 )

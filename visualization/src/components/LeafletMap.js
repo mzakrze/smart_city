@@ -5,6 +5,7 @@ import ElasticsearchFacade from './ElasticsearchFacade.js';
 import { Settings } from './../App.js';
 import TripIndexFacade from "./TripIndexFacade";
 import LeafletRoadPlotLayer from "./LeafletRoadPlotLayer";
+import GraphProvider from "./GraphProvider";
 
 const L = window.L;
 class LeafletMap extends React.Component{
@@ -43,7 +44,7 @@ class LeafletMap extends React.Component{
         this.map = L.map('leaflet-map-id').setView([52.219111, 21.011711], 19);
 
         // TODO - experiment with tile servers: https://wiki.openstreetmap.org/wiki/Tile_servers
-        var mapTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        var mapTileLayer = L.tileLayer('', {
             maxZoom: 21,
             attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             opacity: 0.0 // FIXME - taki hack - dzięki temu tilelayer działa nam przesuwanie i zoomowanie, dajemy opacity 0 bo nie potrzebujemy tej mapy
@@ -204,37 +205,40 @@ class LeafletMap extends React.Component{
             imperial: false
         }).addTo(this.map);
 
+        new GraphProvider()
+            .getGraph()
+            . then(graph => that.roadPlotLayer.initRoadPlotLayer(graph))
 
         // FIXME - do poprawy przed przeniesieniem na inne srodowisko
-        let nodesPromise = fetch('http://localhost:3000/nodes.ndjson')
-            .then(res => res.text())
-
-        let edgesPromise = fetch('http://localhost:3000/edges.ndjson')
-            .then(res => res.text())
-
-        Promise.all([nodesPromise, edgesPromise])
-            .then(values => {
-                let nodes = {} 
-                let edges = [] 
-                for (let line of values[0].split("\n")) {
-                    if (line == "") {
-                        continue;
-                    }
-                    let n = JSON.parse(line)
-                    nodes[n.id] = n
-                }
-                for (let line of values[1].split("\n")) {
-                    if (line == "") {
-                        continue;
-                    }
-                    let e = JSON.parse(line)
-                    edges.push(e)
-                }
-
-                const graph = { nodes, edges }
-                // that.graphPlotLayer.initGraphPlotLayer(graph)
-                that.roadPlotLayer.initRoadPlotLayer(graph)
-            })
+        // let nodesPromise = fetch('http://localhost:3000/nodes.ndjson')
+        //     .then(res => res.text())
+        //
+        // let edgesPromise = fetch('http://localhost:3000/edges.ndjson')
+        //     .then(res => res.text())
+        //
+        // Promise.all([nodesPromise, edgesPromise])
+        //     .then(values => {
+        //         let nodes = {}
+        //         let edges = []
+        //         for (let line of values[0].split("\n")) {
+        //             if (line == "") {
+        //                 continue;
+        //             }
+        //             let n = JSON.parse(line)
+        //             nodes[n.id] = n
+        //         }
+        //         for (let line of values[1].split("\n")) {
+        //             if (line == "") {
+        //                 continue;
+        //             }
+        //             let e = JSON.parse(line)
+        //             edges.push(e)
+        //         }
+        //
+        //         const graph = { nodes, edges }
+        //         // that.graphPlotLayer.initGraphPlotLayer(graph)
+        //         that.roadPlotLayer.initRoadPlotLayer(graph)
+        //     })
 
         const overlayers = {
 

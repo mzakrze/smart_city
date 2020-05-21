@@ -1,11 +1,11 @@
 import json
 import math
 
-NODES_FILE = "map_visualization/public/nodes.ndjson"
-EDGES_FILE = "map_visualization/public/edges.ndjson"
-META_FILE = "map_visualization/public/graph.json"
+# NODES_FILE = "visualization/public/nodes.ndjson"
+# EDGES_FILE = "visualization/public/edges.ndjson"
+# META_FILE = "visualization/public/graph.json"
 
-GRAPH_FILE = "map_visualization/public/intersection_graph.json"
+GRAPH_FILE = "visualization/public/intersection_graph.json"
 
 class MapSerializer:
 
@@ -30,18 +30,18 @@ class MapSerializer:
 
         self.add_coords(bbox, graph)
 
-        with open(META_FILE, "w") as f:
-            json.dump(meta, f)
-
-        with open(NODES_FILE, "w") as f:
-            for n in graph["nodes"]:
-                json.dump(n, f)
-                f.write("\n")
-
-        with open(EDGES_FILE, "w") as f:
-            for e in graph["edges"]:
-                json.dump(e, f)
-                f.write("\n")
+        # with open(META_FILE, "w") as f:
+        #     json.dump(meta, f)
+        #
+        # with open(NODES_FILE, "w") as f:
+        #     for n in graph["nodes"]:
+        #         json.dump(n, f)
+        #         f.write("\n")
+        #
+        # with open(EDGES_FILE, "w") as f:
+        #     for e in graph["edges"]:
+        #         json.dump(e, f)
+        #         f.write("\n")
 
         with open(GRAPH_FILE, "w") as f:
             json.dump(graph, f, indent=4)

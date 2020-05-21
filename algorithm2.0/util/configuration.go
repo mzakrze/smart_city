@@ -25,7 +25,7 @@ func ReadConfiguration() (Configuration, error) {
 	return Configuration{
 		SimulationName: "test1",
 		VehiclesPerMinute: 60,
-		IntersectionPolicy: "sequential",
+		IntersectionPolicy: "fcfs",
 		SimulationDuration: d,
 		VehicleMaxSpeed: 10,
 		VehicleMaxAcc: 2.0,

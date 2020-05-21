@@ -4,7 +4,6 @@ import (
 	"algorithm2.0/constants"
 	"algorithm2.0/types"
 	"algorithm2.0/util"
-	"fmt"
 	"math"
 )
 
@@ -14,7 +13,7 @@ type IntersectionPolicySequential struct {
 	graph                   *util.Graph
 	nextReservationId		types.ReservationId
 	reservations			[]ipReservation
-
+	replies					[]*DsrcR2VMessage
 }
 
 
@@ -38,10 +37,11 @@ func CreateIntersectionPolicySequential(graph *util.Graph) *IntersectionPolicySe
 		nextReservationId: 1,
 		vehicleToFirstRequestTs: make(map[types.VehicleId]types.Millisecond),
 		reservations: make([]ipReservation, 0),
+		replies: make([]*DsrcR2VMessage, 0),
 	}
 }
 
-func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
+func (ip * IntersectionPolicySequential) ProcessMsg(m *DsrcV2RMessage) {
 
 	if m.MsgType == AimProtocolMsgReservationCancelation {
 		index := math.MinInt32
@@ -58,44 +58,11 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
 		return
 	}
 
-	if _, exists := ip.vehicleToFirstRequestTs[m.Sender]; exists == false {
-		ip.vehicleToFirstRequestTs[m.Sender] = m.TsSent
-	}
-
-	arriveTs, leaveTs, _, _ := ip.calculateRouteForRequest(&m)
+	arriveTs, leaveTs, arriveSpeed, tsToSpeed := ip.calculateRouteForRequest(m)
 
 	if ip.isReserved(arriveTs, leaveTs) {
+		//panic("Sth not ok")
 		return
-	}
-
-	if ip.winningRequest != nil && ip.scoreRequest(ip.winningRequest) < ip.scoreRequest(&m) {
-
-		if m.PlatooningReservationId > 0 {
-			fmt.Println("PlatooningReservationId rejected, because there is better offer")
-		}
-
-		return
-	}
-
-	ip.winningRequest = &m
-}
-
-
-func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*DsrcR2VMessage {
-	//if ip.nextAvailableTs - ts > 0 {
-	//	// we still have time to make a decision
-	//	return []*DsrcR2VMessage{}
-	//}
-	if ip.winningRequest == nil {
-		return []*DsrcR2VMessage{}
-	}
-	req := ip.winningRequest
-	ip.winningRequest = nil
-
-	arriveTs, leaveTs, arriveSpeed, tsToSpeed := ip.calculateRouteForRequest(req)
-
-	if ip.isReserved(arriveTs, leaveTs) {
-		panic("Sth not ok")
 	}
 
 	ip.reservations = append(ip.reservations, ipReservation{
@@ -108,7 +75,7 @@ func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*Dsrc
 
 	offer := &DsrcR2VMessage{
 		msgType: AimProtocolMsgAllow,
-		receiver: req.Sender,
+		receiver: m.Sender,
 		reservationFromTs: arriveTs,
 		reservationToTs: leaveTs,
 		reservationDesiredSpeed: arriveSpeed,
@@ -117,8 +84,74 @@ func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*Dsrc
 	}
 	ip.nextReservationId += 1
 
-	res := []*DsrcR2VMessage{offer}
-	return res
+	ip.replies = append(ip.replies, offer)
+
+	//res := []*DsrcR2VMessage{offer}
+
+	//if _, exists := ip.vehicleToFirstRequestTs[m.Sender]; exists == false {
+	//	ip.vehicleToFirstRequestTs[m.Sender] = m.TsSent
+	//}
+	//
+	//arriveTs, leaveTs, _, _ := ip.calculateRouteForRequest(m)
+	//
+	//if ip.isReserved(arriveTs, leaveTs) {
+	//	return
+	//}
+	//
+	//if ip.winningRequest != nil && ip.scoreRequest(ip.winningRequest) < ip.scoreRequest(m) {
+	//	return
+	//}
+	//
+	//ip.winningRequest = m
+}
+
+
+func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*DsrcR2VMessage {
+	//if ip.nextAvailableTs - ts > 0 {
+	//	// we still have time to make a decision
+	//	return []*DsrcR2VMessage{}
+	//}
+	//if ip.winningRequest == nil {
+	//	return []*DsrcR2VMessage{}
+	//}
+	//req := ip.winningRequest
+	//ip.winningRequest = nil
+	//
+	//arriveTs, leaveTs, arriveSpeed, tsToSpeed := ip.calculateRouteForRequest(req)
+	//
+	//if ip.isReserved(arriveTs, leaveTs) {
+	//	//panic("Sth not ok")
+	//}
+	//
+	//ip.reservations = append(ip.reservations, ipReservation{
+	//	from: arriveTs,
+	//	to: leaveTs,
+	//	id: ip.nextReservationId,
+	//})
+	//
+	////ip.assertReservationsDontOverlap()
+	//
+	//offer := &DsrcR2VMessage{
+	//	msgType: AimProtocolMsgAllow,
+	//	receiver: req.Sender,
+	//	reservationFromTs: arriveTs,
+	//	reservationToTs: leaveTs,
+	//	reservationDesiredSpeed: arriveSpeed,
+	//	reservationTsToSpeed: tsToSpeed,
+	//	reservationId: ip.nextReservationId,
+	//}
+	//ip.nextReservationId += 1
+	//
+	//res := []*DsrcR2VMessage{offer}
+
+	if ts % 10 == 0 {
+		res := ip.replies
+		ip.replies = []*DsrcR2VMessage{}
+		return res
+	} else {
+		return []*DsrcR2VMessage{}
+	}
+
 }
 
 
@@ -189,7 +222,7 @@ func (ip *IntersectionPolicySequential) distanceOnConflictZone(msg *DsrcV2RMessa
 }
 
 func (ip *IntersectionPolicySequential) calculateRouteForRequest(req *DsrcV2RMessage) (types.Millisecond, types.Millisecond, types.MetersPerSecond, map[types.Millisecond]types.MetersPerSecond) {
-	approachConflictZoneSpeed := req.ApproachConflictZoneSpeedMax
+	approachConflictZoneSpeed := req.ApproachConflictZoneSpeed
 	approachConflictZoneTs := req.ApproachConflictZoneMinTs + constants.SimulationStepInterval
 
 	reservationTsToSpeed := make(map[types.Millisecond]types.MetersPerSecond)
@@ -212,7 +245,7 @@ func (ip *IntersectionPolicySequential) calculateRouteForRequest(req *DsrcV2RMes
 		if req.IsTurning {
 			accelerateTo(req.MaxSpeedOnCurve)
 		} else {
-			accelerateTo(maxSpeed)
+			accelerateTo(maxSpeedOnConflictZone)
 		}
 	}
 

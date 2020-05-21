@@ -6,7 +6,7 @@ import (
 )
 
 type IntersectionPolicy interface {
-	ProcessMsg(message DsrcV2RMessage)
+	ProcessMsg(message *DsrcV2RMessage)
 	GetReplies(millisecond types.Millisecond) []*DsrcR2VMessage
 }
 
@@ -17,15 +17,15 @@ type IntersectionManager struct {
 	nextAvailableTs types.Millisecond
 }
 
-func IntersectionManagerSingleton(graph *util.Graph, networkCard *CommunicationLayer, intersectionPolicyId string) (*IntersectionManager, error) {
+func IntersectionManagerSingleton(graph *util.Graph, networkCard *CommunicationLayer, configuration util.Configuration) (*IntersectionManager, error) {
 	if instance == nil {
 		var policy IntersectionPolicy
 		// TODO - use reflection to create instance (add method to IntersectionPolicy returing code)
-		switch intersectionPolicyId {
+		switch configuration.IntersectionPolicy {
 		case "sequential":
 			policy = CreateIntersectionPolicySequential(graph)
 		case "fcfs":
-			policy = CreateIntersectionPolicyFcfs(graph)
+			policy = CreateIntersectionPolicyFcfs(graph, configuration)
 		default:
 			panic("Illegal name of intersection policy")
 		}
@@ -52,7 +52,7 @@ func (im *IntersectionManager) Ping(ts types.Millisecond) {
 	replies := im.policy.GetReplies(ts)
 	for _, r := range replies {
 		r.tsSent = ts
-		im.networkCard.SendDsrcR2V(*r)
+		im.networkCard.SendDsrcR2V(r)
 	}
 
 }
