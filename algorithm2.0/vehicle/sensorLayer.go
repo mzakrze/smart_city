@@ -17,7 +17,7 @@ func SensorLayerSingleton(proxy *AllVehicleProxy, graph *util.Graph) *SensorLaye
 	return instanceSensor
 }
 
-func (sensor *SensorLayer) ScanVehiclesAhead (vehicle *VehicleActor) float64 {
+func (sensor *SensorLayer) ScanVehiclesAhead (vehicle *VehicleActor) (float64, types.VehicleId) {
 	const measurementPrecision = 0.1
 
 	stepX := 0.0
@@ -42,7 +42,8 @@ func (sensor *SensorLayer) ScanVehiclesAhead (vehicle *VehicleActor) float64 {
 		offsetX = constants.VehicleLength
 		offsetY = constants.VehicleWidth
 	default:
-		panic("Illegal sensor query")
+		return -1, -1
+		//panic("Illegal sensor query")
 	}
 
 	var collidedWith *VehicleActor = nil
@@ -72,13 +73,13 @@ func (sensor *SensorLayer) ScanVehiclesAhead (vehicle *VehicleActor) float64 {
 			res -= math.Sin(collidedWith.Alpha) * constants.VehicleWidth / 2
 
 			if res < 0.0 {
-				return 0.0 // FIXME - lekki hack - w powyższym jest drobny błąd - źle wyliczana jest odległość w zależności od kąta pojazdu, z którym sie zderza
-				//panic("oops")
+				return 0.0, collidedWith.Id // FIXME - lekki hack - w powyższym jest drobny błąd - źle wyliczana jest odległość w zależności od kąta pojazdu, z którym sie zderza
+				//panic("Oops")
 			}
-			return res
+			return res, collidedWith.Id
 		}
 	}
-	return MaxDistanceMeasurement
+	return MaxDistanceMeasurement, -1
 }
 
 

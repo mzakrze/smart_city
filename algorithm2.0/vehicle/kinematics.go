@@ -47,26 +47,28 @@ func arrivalTimeAccelerating(v0, vMax types.MetersPerSecond, a types.MetersPerSe
 
 /**
 Pojazd jedzie z predkoscia v, zaczyna przyspieszać, maksymalnie do prędkości maxV, z przyspieszeniem a
-W ile czasu pokona dystans s, zakładając, że na końcu odcinka musi mieć predkosc v2 (może hamować z wartością d)?
+W ile czasu (t1 + t2 +t3) pokona dystans s, zakładając, że na końcu odcinka musi mieć predkosc v2 (może hamować z wartością d)?
+Ile czasu t1 przyspiesza, ile czasu t2 jedzie jednostajnie, ile czasu t3 hamuje?
  */
-func arrivalTimeAcceleratingEnterWithSpeed(v0, vMax types.MetersPerSecond, a, d types.MetersPerSecond2, s types.Meter, v2 types.MetersPerSecond) types.Millisecond {
+func arrivalTimeAcceleratingEnterWithSpeed(v0, vMax types.MetersPerSecond, a, d types.MetersPerSecond2, s types.Meter, v2 types.MetersPerSecond) (types.Millisecond, types.Millisecond, types.Millisecond) {
 	v1 := vAfterAcceleratingOverDistance(v0, a, s)
 
 	if v1 < v2 {
 		// caly czas przyspieszamy
-		return roundTimeResult(types.Millisecond((math.Sqrt(v0 * v0 + 2 * s * a) - v0) / a * 1000.0))
+		t1 := roundTimeResult(types.Millisecond((math.Sqrt(v0 * v0 + 2 * s * a) - v0) / a * 1000.0))
+		return t1, 0, 0
 	} else {
 		// przez czas t1 przyspieszamy, przez czas t2 (możliwe że t2 = 0) jedziemy jednostajnie, przez czas t3 hamujemy
 
-		t1 := (vMax - v0) / a
-		t3 := (vMax - v2) / d
+		t1 := float64((vMax - v0) / a)
+		t3 := float64((vMax - v2) / d)
 
-		t2 := s / vMax + (v0 * v0 - vMax * vMax) / (2.0 * vMax * a) + (v2 * v2 - vMax * vMax) / (2.0 * vMax * d)
+		t2 := float64(s / vMax + (v0 * v0 - vMax * vMax) / (2.0 * vMax * a) + (v2 * v2 - vMax * vMax) / (2.0 * vMax * d))
 		if t2 < 0.0 {
 			panic("Oops")
 		}
 
-		return roundTimeResult(types.Millisecond((t1 + t2 + t3) * 1000.0))
+		return roundTimeResult(types.Millisecond(t1 * 1000.0)), roundTimeResult(types.Millisecond(t2 * 1000.0)), roundTimeResult(types.Millisecond(t3 * 1000.0))
 	}
 }
 
@@ -78,5 +80,3 @@ Do jakiej prędkości się rozpędzi?
 func vAfterAcceleratingOverDistance(v0 types.MetersPerSecond, a types.MetersPerSecond2, s types.Meter) types.MetersPerSecond {
 	return math.Sqrt(v0 * v0 + 2 * s * a)
 }
-
-

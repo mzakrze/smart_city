@@ -11,11 +11,13 @@ const (
 	AimProtocolMsgRequest = iota
 	AimProtocolMsgReservationCancelation
 	AimProtocolMsgAllow
+	AimProtocolMsgReservationInfo
 )
 
 type DsrcV2RMessage struct {
 	MsgType                      AimProtocolMessageType
-	ReservationId                types.ReservationId
+	ReservationToCancelId        types.ReservationId
+	PlatooningReservationId      types.ReservationId
 	TsSent                       types.Millisecond
 	Sender                       types.VehicleId
 	VehicleX                     types.XCoord
@@ -29,7 +31,6 @@ type DsrcV2RMessage struct {
 	IsTurning                    bool
 	EntryPointId                 types.NodeId
 	ExitPointId                  types.NodeId
-	ConflictZoneLengthDebug      types.Meter
 }
 
 type DsrcR2VMessage struct {
@@ -43,11 +44,32 @@ type DsrcR2VMessage struct {
 	reservationTsToSpeed    map[types.Millisecond]types.MetersPerSecond
 }
 
+type DsrcV2VMessage struct {
+	msgType 				AimProtocolMessageType
+	sender 					types.VehicleId
+	reservationId 			types.ReservationId
+	reservationFromTs 		types.Millisecond
+	reservationTsToSpeed 	map[types.Millisecond]types.MetersPerSecond
+}
+
 func CommunicationLayerSingleton(proxy *AllVehicleProxy) *CommunicationLayer {
 	if instanceCommunication == nil {
-		instanceCommunication = &CommunicationLayer{proxy: proxy, vehicleToReceive: make(map[types.VehicleId][]DsrcR2VMessage)}
+		instanceCommunication = &CommunicationLayer{
+			proxy: proxy,
+			vehicleToReceive: make(map[types.VehicleId][]DsrcR2VMessage),
+			vehicleToReceiveV2V: make(map[types.VehicleId][]DsrcV2VMessage),
+		}
 	}
 	return instanceCommunication
+}
+
+func (c *CommunicationLayer) SendDsrcV2V(m DsrcV2VMessage) {
+	for _, v := range c.proxy.GetAllVehicles() {
+		if v.Id == m.sender {
+			continue
+		}
+		c.vehicleToReceiveV2V[v.Id] = append(c.vehicleToReceiveV2V[v.Id], m)
+	}
 }
 
 func (c *CommunicationLayer) SendDsrcV2R(m DsrcV2RMessage) {
@@ -63,9 +85,17 @@ func (c *CommunicationLayer) SendDsrcR2V(m DsrcR2VMessage) {
 	c.vehicleToReceive[m.receiver] = append(c.vehicleToReceive[m.receiver], m)
 }
 
+
+
 func (c *CommunicationLayer) VehicleReceive(id types.VehicleId) []DsrcR2VMessage {
 	queue := c.vehicleToReceive[id]
 	delete(c.vehicleToReceive, id)
+	return queue
+}
+
+func (c *CommunicationLayer) VehicleReceiveV2V(id types.VehicleId) []DsrcV2VMessage {
+	queue := c.vehicleToReceiveV2V[id]
+	delete(c.vehicleToReceiveV2V, id)
 	return queue
 }
 
@@ -86,6 +116,7 @@ var instanceCommunication *CommunicationLayer = nil
 type CommunicationLayer struct {
 	proxy *AllVehicleProxy
 	vehicleToReceive map[types.VehicleId][]DsrcR2VMessage
+	vehicleToReceiveV2V map[types.VehicleId][]DsrcV2VMessage
 	imToReceive []DsrcV2RMessage
 }
 

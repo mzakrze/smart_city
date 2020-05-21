@@ -4,6 +4,7 @@ import (
 	"algorithm2.0/constants"
 	"algorithm2.0/types"
 	"algorithm2.0/util"
+	"fmt"
 	"math"
 )
 
@@ -45,7 +46,7 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
 	if m.MsgType == AimProtocolMsgReservationCancelation {
 		index := math.MinInt32
 		for i := range ip.reservations {
-			if ip.reservations[i].id == m.ReservationId {
+			if ip.reservations[i].id == m.ReservationToCancelId {
 				index = i
 			}
 		}
@@ -67,7 +68,12 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
 		return
 	}
 
-	if ip.winningRequest != nil && ip.scoreRequest(ip.winningRequest) > ip.scoreRequest(&m) {
+	if ip.winningRequest != nil && ip.scoreRequest(ip.winningRequest) < ip.scoreRequest(&m) {
+
+		if m.PlatooningReservationId > 0 {
+			fmt.Println("PlatooningReservationId rejected, because there is better offer")
+		}
+
 		return
 	}
 
@@ -161,10 +167,7 @@ The higher, the better (IP will more likely grant reservation)
 func (ip *IntersectionPolicySequential) scoreRequest(message *DsrcV2RMessage) float64 {
 	res := 0.0
 
-	// punishment for late arrival
-	res -= float64(message.ApproachConflictZoneMinTs)
-
-	//res += float64(ip.vehicleToFirstRequestTs[message.Sender])
+	res = -float64(message.ApproachConflictZoneMinTs)
 
 	return res
 }
