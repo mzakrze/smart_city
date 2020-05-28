@@ -1,8 +1,8 @@
 package vehicle
 
 import (
-	"algorithm2.0/types"
-	"algorithm2.0/util"
+	"algorithm/types"
+	"algorithm/util"
 	"math/rand"
 )
 

@@ -1,4 +1,4 @@
-module algorithm2.0
+module algorithm
 
 go 1.12
 

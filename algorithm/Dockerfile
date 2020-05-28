@@ -1,6 +1,6 @@
 FROM golang:1.14.1
 
-WORKDIR /go/src/algorithm2.0/
+WORKDIR /go/src/algorithm/
 
 RUN go get -d -v github.com/fluent/fluent-logger-golang/fluent
 
@@ -20,6 +20,6 @@ FROM ubuntu:latest
 
 WORKDIR /root/
 
-COPY --from=0 /go/src/algorithm2.0/app .
+COPY --from=0 /go/src/algorithm/app .
 
-CMD ["./app"]
+CMD ["./app", "--docker", "true"]

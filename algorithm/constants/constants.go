@@ -1,6 +1,6 @@
 package constants
 
-import "algorithm2.0/types"
+import "algorithm/types"
 
 // TODO - stała SimulationStepInterval w sekundach - bo bardzo dużo jest castowania na floaat + dzielenia przez 10000
 const SimulationStepInterval = types.Millisecond(10)

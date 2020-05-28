@@ -1,7 +1,7 @@
 package logging
 
 import (
-	"algorithm2.0/types"
+	"algorithm/types"
 	"fmt"
 	"github.com/fluent/fluent-logger-golang/fluent"
 	"testing"

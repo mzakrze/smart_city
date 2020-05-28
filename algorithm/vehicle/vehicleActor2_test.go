@@ -1,8 +1,8 @@
 package vehicle
 
 import (
-	"algorithm2.0/constants"
-	"algorithm2.0/types"
+	"algorithm/constants"
+	"algorithm/types"
 	"math"
 	"math/rand"
 	"testing"

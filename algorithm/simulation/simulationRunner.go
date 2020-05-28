@@ -1,11 +1,11 @@
 package simulation
 
 import (
-	"algorithm2.0/constants"
-	"algorithm2.0/logging"
-	"algorithm2.0/types"
-	"algorithm2.0/util"
-	"algorithm2.0/vehicle"
+	"algorithm/constants"
+	"algorithm/logging"
+	"algorithm/types"
+	"algorithm/util"
+	"algorithm/vehicle"
 	"math"
 	"math/rand"
 	"time"

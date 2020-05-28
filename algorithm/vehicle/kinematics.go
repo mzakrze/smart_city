@@ -1,7 +1,7 @@
 package vehicle
 
 import (
-	"algorithm2.0/types"
+	"algorithm/types"
 	"math"
 )
 

@@ -1,3 +1,5 @@
+#!/usr/bin/python3.6
+
 import sys
 sys.path.insert(1, 'mapGenerator')
 from generate import generate_map_json
@@ -8,6 +10,7 @@ import json
 import time
 import os
 
+simulation_name = "simulation"
 
 class Config:
     def __init__(self):
@@ -26,11 +29,10 @@ def read_args():
     parser = argparse.ArgumentParser(description='Runs simulation')
 
     parser.add_argument('--config', help='Path to simulation configuration file', required=True)
-    parser.add_argument('--simulation_name', help='Name of simulation', required=True)
 
     args = parser.parse_args()
 
-    return args.config, args.simulation_name
+    return args.config
 
 def parse_config(path):
     try:
@@ -56,43 +58,36 @@ def parse_config(path):
     return config, content
 
 
-def insert_to_elastic(name, graph_raw, config_raw):
-    url = 'http://localhost:9200/simulation-info/_doc/' + name
-    myobj = {'simulation_name': name, "graph_raw": graph_raw, "config_raw": config_raw}
+def insert_to_elastic(graph_raw, config_raw):
+    url = 'http://localhost:9200/simulation-info/_doc/' + simulation_name
+    myobj = {'simulation_name': simulation_name, "graph_raw": graph_raw, "config_raw": config_raw}
 
     requests.post(url, data=json.dumps(myobj), headers={'Content-Type': 'application/json; charset=UTF-8'})
 
     time.sleep(1)  # wait for elastic to index data
 
 
-def delete_old(name):
-    url = 'http://localhost:9200/simulation-info/_doc/' + name
+def delete_old():
+    url = 'http://localhost:9200/simulation-info/_doc/' + simulation_name
     r = requests.delete(url)
 
 if __name__ == "__main__":
     print("Reading configuration ...")
-    config_path, name = read_args()
-    delete_old(name)
+    config_path = read_args()
+    delete_old()
     config, config_raw = parse_config(config_path)
 
     print("Generating map ...")
     map_raw_json = generate_map_json("junction_x", config.map_lanes)
-    insert_to_elastic(name, map_raw_json, config_raw)
+    insert_to_elastic(map_raw_json, config_raw)
 
-    # print("Running simulation ...")
-    #
-    # os.chdir("algorithm2.0")
-    # os.system("go run main.go")
+    print("Building image ...")
+    os.chdir("algorithm")
+    os.system("docker build -t simulation_algorithm . -q")
 
+    print("Running simulation ...")
+    os.system("docker run --network smart_city_efk simulation_algorithm")
 
-
-
-
-
-
-
-
-
-
+    print("Finished.")
 
 

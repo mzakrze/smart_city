@@ -1,6 +1,6 @@
 #!/bin/bash
 
-sleep 10 # wait for elastic
+sleep 20 # wait for elastic
 
 curl -X DELETE elastic:9200/simulation-log-1
 echo ""

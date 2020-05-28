@@ -1,10 +1,10 @@
 package main
 
 import (
-	"algorithm2.0/logging"
-	"algorithm2.0/simulation"
-	"algorithm2.0/util"
-	"algorithm2.0/vehicle"
+	"algorithm/logging"
+	"algorithm/simulation"
+	"algorithm/util"
+	"algorithm/vehicle"
 	"flag"
 	"github.com/fluent/fluent-logger-golang/fluent"
 	"math/rand"
@@ -12,15 +12,12 @@ import (
 	"net/url"
 )
 
-var dockerEnv bool
-func init() {
-	flag.BoolVar(&dockerEnv, "docker", false, "help message for flagname")
-}
-
 func main() {
+	dockerEnv := flag.Bool( "docker", false, "Is run in docker (effects host of elastic and fluent)")
+	flag.Parse()
 
 	var elasticHost, fluentHost string
-	if dockerEnv {
+	if *dockerEnv {
 		elasticHost = "elastic"
 		fluentHost = "fluentd"
 	} else {

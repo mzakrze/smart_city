@@ -1,7 +1,7 @@
 package util
 
 import (
-	"algorithm2.0/types"
+	"algorithm/types"
 	"encoding/json"
 	"math"
 

@@ -1,7 +1,7 @@
 package vehicle
 
 import (
-	"algorithm2.0/util"
+	"algorithm/util"
 	"fmt"
 	"image"
 	"image/color"
