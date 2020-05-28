@@ -37,6 +37,15 @@ services:
     networks:
       - efk
 
+  elasticsearch-mapping-init:
+    build: ./efk/images/elastic-init
+    links:
+      - elastic
+    depends_on:
+      - elastic
+    networks:
+      - efk
+
   kibana:
     image: docker.elastic.co/kibana/kibana:7.6.1
     volumes:

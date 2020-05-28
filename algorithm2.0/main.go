@@ -5,29 +5,43 @@ import (
 	"algorithm2.0/simulation"
 	"algorithm2.0/util"
 	"algorithm2.0/vehicle"
+	"flag"
 	"github.com/fluent/fluent-logger-golang/fluent"
 	"math/rand"
 	"net/http"
 	"net/url"
 )
 
+var dockerEnv bool
+func init() {
+	flag.BoolVar(&dockerEnv, "docker", false, "help message for flagname")
+}
 
 func main() {
+
+	var elasticHost, fluentHost string
+	if dockerEnv {
+		elasticHost = "elastic"
+		fluentHost = "fluentd"
+	} else {
+		elasticHost = "localhost"
+		fluentHost = "localhost"
+	}
 
 	//rand.Seed(time.Now().Unix())
 	rand.Seed(18)
 
-	pruneOldIndicesInElastic()
+	pruneOldIndicesInElastic(elasticHost)
 
 	// create dependencies
 	configuration, err := util.ReadConfiguration(); if err != nil { panic(err) }
-	graph, err := util.ReadGraph(configuration.SimulationName); if err != nil { panic(err) }
+	graph, err := util.ReadGraph(configuration.SimulationName, elasticHost); if err != nil { panic(err) }
 	allVehiclesProxy := vehicle.AllVehiclesProxySingleton()
 	communicationLayer := vehicle.CommunicationLayerSingleton(allVehiclesProxy)
 	sensorLayer := vehicle.SensorLayerSingleton(allVehiclesProxy, graph)
 	collisionDetector := vehicle.NewCollisionDetector(allVehiclesProxy)
 	intersectionManager, err := vehicle.IntersectionManagerSingleton(graph, communicationLayer, configuration); if err != nil { panic(err) }
-	fluentLogger, err := fluent.New(fluent.Config{}); if err != nil { panic(err) }; defer fluentLogger.Close()
+	fluentLogger, err := fluent.New(fluent.Config{FluentHost: fluentHost}); if err != nil { panic(err) }; defer fluentLogger.Close()
 	resultLogger := logging.ResultsLoggerSingleton(fluentLogger, graph.MapWidth, graph.MapWidth, configuration.SimulationDuration.Seconds())
 
 	// create runner
@@ -88,24 +102,24 @@ func runProgressTracker(s *simulation.SimulationRunner, c *util.Configuration) {
 }
 
 
-func pruneOldIndicesInElastic() {
+func pruneOldIndicesInElastic(host string) {
 	client := &http.Client{}
 
 	urlLog := &url.URL{
 		Scheme:  "http",
-		Host: "localhost:9200",
+		Host: host + ":9200",
 		Path: "simulation-map",
 	}
 
 	urlMap := &url.URL{
 		Scheme:  "http",
-		Host: "localhost:9200",
+		Host: host + ":9200",
 		Path: "simulation-vehicle",
 	}
 
 	urlTrip := &url.URL{
 		Scheme:  "http",
-		Host: "localhost:9200",
+		Host: host + ":9200",
 		Path: "simulation-intersection",
 	}
 

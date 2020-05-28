@@ -79,9 +79,9 @@ type conflictZoneRaw struct {
 	MaxY float64
 }
 
-func ReadGraph(simName string) (*Graph, error) {
+func ReadGraph(simName, host string) (*Graph, error) {
 	client := &http.Client{}
-	resp, err := client.Get("http://localhost:9200/simulation-info/_doc/" + simName)
+	resp, err := client.Get("http://" + host + ":9200/simulation-info/_doc/" + simName)
 	if err != nil {
 		panic(err)
 	}

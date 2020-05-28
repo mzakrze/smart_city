@@ -1,7 +1,14 @@
 #!/bin/bash
 
+sleep 10 # wait for elastic
 
-curl -X PUT "localhost:9200/simulation-map" -H 'Content-Type: application/json' -d'
+curl -X DELETE elastic:9200/simulation-log-1
+echo ""
+curl -X DELETE elastic:9200/simulation-map-1
+echo ""
+curl -X DELETE elastic:9200/simulation-trip-1
+
+curl -X PUT "elastic:9200/simulation-map" -H 'Content-Type: application/json' -d'
 {
     "settings": {
         "number_of_shards": 1,
@@ -40,7 +47,7 @@ echo
 echo
 
 
-curl -X PUT "localhost:9200/_template/simulation-vehicle-template" -H 'Content-Type: application/json' -d'
+curl -X PUT "elastic:9200/_template/simulation-vehicle-template" -H 'Content-Type: application/json' -d'
 {
     "index_patterns": ["simulation-vehicle"],
     "settings": {
@@ -85,7 +92,7 @@ echo
 echo
 
 
-curl -X PUT "localhost:9200/_template/simulation-info-template" -H 'Content-Type: application/json' -d'
+curl -X PUT "elastic:9200/_template/simulation-info-template" -H 'Content-Type: application/json' -d'
 {
     "index_patterns": ["simulation-info"],
     "settings": {
@@ -129,7 +136,7 @@ echo
 echo
 
 
-curl -X PUT "localhost:9200/_template/simulation-intersection-template" -H 'Content-Type: application/json' -d'
+curl -X PUT "elastic:9200/_template/simulation-intersection-template" -H 'Content-Type: application/json' -d'
 {
     "index_patterns": ["simulation-intersection"],
     "settings": {
@@ -164,7 +171,7 @@ echo
 
 
 
-curl -X PUT "localhost:9200/_template/simulation-vehiclestep-template" -H 'Content-Type: application/json' -d'
+curl -X PUT "elastic:9200/_template/simulation-vehiclestep-template" -H 'Content-Type: application/json' -d'
 {
     "index_patterns": ["simulation-vehiclestep"],
     "settings": {
