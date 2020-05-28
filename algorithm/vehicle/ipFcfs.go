@@ -6,6 +6,7 @@ import (
 	"algorithm/util"
 	"fmt"
 	"math"
+	"runtime"
 )
 
 type GridState int
@@ -16,19 +17,20 @@ const (
 
 type IntersectionPolicyFcfs struct {
 	reservationTable  [][][]GridState
-	replies           []*DsrcR2VMessage
-	gridNoX           int
-	gridNoY           int
-	reservations      []*ipFcfsReservation
+	replies           []DsrcR2VMessage
+	reservations      map[types.ReservationId]ipFcfsReservation
 	nextReservationId types.ReservationId
 	graph             *util.Graph
+	tableIndex        types.Millisecond
 }
-const gridSize types.Meter = 0.1 // FIXME
+const gridSize types.Meter = 0.1
+const tableSize = 60 * 100 // na 60 sekund
 
 type ipFcfsReservation struct {
-	reservationId 	types.ReservationId
-	startTs			types.Millisecond
-	reservedGrids	[][]grid
+	reservationId types.ReservationId
+	startTs       types.Millisecond
+	endTs         types.Millisecond
+	reservedGrids [][]grid
 }
 
 var gridNoX = -1
@@ -42,14 +44,13 @@ type grid struct {
 }
 
 func CreateIntersectionPolicyFcfs(graph *util.Graph, configuration util.Configuration) *IntersectionPolicyFcfs {
+	// TODO - nieużywany argument
 	gridNoX = int((graph.ConflictZone.MaxX - graph.ConflictZone.MinX) / gridSize)
 	gridNoY = int((graph.ConflictZone.MaxY - graph.ConflictZone.MinY) / gridSize)
 	conflictZoneMinX = graph.ConflictZone.MinX
 	conflictZoneMinY = graph.ConflictZone.MinY
 
-	// times 2 just for optimization (to not deallocate memory multiple times)
-	reservationTable :=  make([][][]GridState, int(configuration.SimulationDuration.Seconds() * 2 * 1000 / float64(constants.SimulationStepInterval)))
-	//reservationTable :=  make([][][]GridState, 1 * 1)
+	reservationTable :=  make([][][]GridState, tableSize)
 	for i := 0; i < len(reservationTable); i++ {
 		reservationTable[i] = make([][]GridState, gridNoX)
 		for x := range reservationTable[i] {
@@ -58,40 +59,68 @@ func CreateIntersectionPolicyFcfs(graph *util.Graph, configuration util.Configur
 	}
 
 	return &IntersectionPolicyFcfs{
-		replies: []*DsrcR2VMessage{},
+		replies: []DsrcR2VMessage{},
 		reservationTable: reservationTable,
+		reservations: make(map[types.ReservationId]ipFcfsReservation),
 		nextReservationId: 1,
 		graph: graph,
+		tableIndex: 0,
 	}
 }
 
-func (ip * IntersectionPolicyFcfs) ProcessMsg(m *DsrcV2RMessage) {
+func (ip * IntersectionPolicyFcfs) ProcessMsg(m DsrcV2RMessage) {
 	if m.MsgType == AimProtocolMsgReservationCancelation {
 		ip.cancelReservation(m.ReservationToCancelId)
 		return
 	}
 
-	//fmt.Print("IM processing msg from ", m.Sender, ", result =")
-
-	before := ip.calcOccupied()
-
 	success := ip.makeReservationIfFitsInReservationTable(m)
 	if success == false {
-		//fmt.Println("Rejected")
 		return
 	}
 
-	//fmt.Println("Accepted")
-	after := ip.calcOccupied()
-	fmt.Println("request from ", m.Sender, ", Before:", before, ", after:", after, ", diff: ", (after - before))
-
 }
 
-
-func (ip *IntersectionPolicyFcfs) GetReplies(ts types.Millisecond) []*DsrcR2VMessage {
+func (ip *IntersectionPolicyFcfs) GetReplies(ts types.Millisecond) []DsrcR2VMessage {
 	res := ip.replies
-	ip.replies = []*DsrcR2VMessage{}
+	ip.replies = []DsrcR2VMessage{}
+	if ts % 1000 == 0 {
+		ip.cleanupOldReservations(ts)
+	}
+	ip.relocateTableIfNecessary(ts)
+
 	return res
+}
+
+func (ip *IntersectionPolicyFcfs) cleanupOldReservations(ts types.Millisecond) {
+	toDelete := []types.ReservationId{}
+	for rId := range ip.reservations {
+		if ip.reservations[rId].endTs < ts {
+			toDelete = append(toDelete, rId)
+		}
+	}
+
+	for _, rId := range toDelete {
+		delete(ip.reservations, rId)
+	}
+
+	runtime.GC()
+
+	//bToMb := func (b uint64) uint64 {
+	//	return b / 1024 / 1024
+	//}
+
+	//var m runtime.MemStats
+	//runtime.ReadMemStats(&m)
+	//// For info on each, see: https://golang.org/pkg/runtime/#MemStats
+	//fmt.Printf("Alloc = %v MiB", bToMb(m.Alloc))
+	//fmt.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+	//fmt.Printf("\tSys = %v MiB", bToMb(m.Sys))
+	//fmt.Printf("\tNumGC = %v\n", m.NumGC)
+	//
+	//if bToMb(m.Sys) > 8000 {
+	//	panic("To much memory allocated")
+	//}
 }
 
 func xToGridX(x types.XCoord) int {
@@ -144,7 +173,7 @@ func (ip *IntersectionPolicyFcfs) getPointerByIdEntryExit (entryId, exitId types
 	return entry, exit
 }
 
-func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg *DsrcV2RMessage) bool {
+func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg DsrcV2RMessage) bool {
 	var moveVehicle func(meter types.Meter)
 	var accelerateVehicle func()
 	var exitX, exitY float64
@@ -155,7 +184,7 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg *D
 	if msg.IsTurning {
 		vMax = msg.MaxSpeedOnCurve
 	} else {
-		vMax = maxSpeedOnConflictZone
+		vMax = constants.VehicleMaxSpeedOnConflictZone
 	}
 
 	var reservationTsToSpeed map[types.Millisecond]types.MetersPerSecond
@@ -218,14 +247,15 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg *D
 	}
 
 	accelerateVehicle = func () {
-		const maxSpeedDiff = float64(maxAcc * float64(constants.SimulationStepInterval) / 1000.0)
 		if speed == vMax {
 			return
 		}
-		if speed + maxSpeedDiff >= vMax {
+
+		diff := velocityDiffStepAccelerating(speed)
+		if speed + diff >= vMax {
 			speed = vMax
-		} else if speed + maxSpeedDiff < vMax {
-			speed += maxSpeedDiff
+		} else if speed + diff < vMax {
+			speed += diff
 		} else {
 			panic("Oops")
 		}
@@ -233,7 +263,6 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg *D
 
 	reservationFromTs := msg.ApproachConflictZoneMinTs
 
-	// zero state
 	if msg.IsTurning {
 		vehicleRoute = vehicleRoute[1:]
 	}
@@ -242,8 +271,7 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg *D
 	exitX = vehicleRoute[len(vehicleRoute) - 1].X
 	exitY = vehicleRoute[len(vehicleRoute) - 1].Y
 
-	//alpha = getAlpha(msg.VehicleX, msg.VehicleY, entry.X, entry.Y)
-	alpha = 0 // FIXME
+	alpha = getAlpha(x, y, exitX, exitY)
 	speed = msg.ApproachConflictZoneSpeed
 	currentRouteIndex = 0
 	ts = reservationFromTs
@@ -251,7 +279,6 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg *D
 
 	fitsInReservationTable := true
 	guard := 0
-	maxTs := types.Millisecond(0)
 	outer_for_label:
 	for ; exited() == false; ts += constants.SimulationStepInterval {
 		if guard > 5000 {
@@ -265,7 +292,7 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg *D
 		reservationTsToSpeed[ts] = speed
 
 		for i := range grids {
-			asdf := ip.reservationTable[ts/10]
+			asdf := ip.reservationTable[ip.tableIndex + ts/10]
 			state := asdf[grids[i].x][grids[i].y]
 			if state == taken {
 				fitsInReservationTable = false
@@ -277,8 +304,6 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg *D
 		d := speed * float64(constants.SimulationStepInterval) / 1000.0
 		moveVehicle(d)
 
-		maxTs = ts
-		_ = maxTs
 	}
 
 	if fitsInReservationTable == false {
@@ -293,19 +318,20 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg *D
 			x := reservedGrids[j][i].x
 			y := reservedGrids[j][i].y
 
-			ip.reservationTable[ts/10][x][y] = taken
+			ip.reservationTable[ip.tableIndex + ts/10][x][y] = taken
 		}
 		ts += constants.SimulationStepInterval
 	}
 
-	reservation := &ipFcfsReservation{
+	reservation := ipFcfsReservation{
 		reservationId: ip.nextReservationId,
 		startTs: reservationFromTs,
+		endTs: ts,
 		reservedGrids: reservedGrids,
 	}
 	ip.nextReservationId += 1
 
-	reply := &DsrcR2VMessage{
+	reply := DsrcR2VMessage{
 		msgType: AimProtocolMsgAllow,
 		receiver: msg.Sender,
 		reservationFromTs: reservationFromTs,
@@ -314,38 +340,69 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg *D
 		reservationTsToSpeed: reservationTsToSpeed,
 	}
 
-	ip.reservations = append(ip.reservations, reservation)
+	ip.reservations[reservation.reservationId] = reservation
 	ip.replies = append(ip.replies, reply)
 
 	return true
 }
 
 func (ip *IntersectionPolicyFcfs) cancelReservation(reservationId types.ReservationId) {
-	// FIXME - plz implement me
+	fmt.Println("cancelling")
+	reservation := ip.reservations[reservationId]
 
-	// TODO
-	// 1 - funkcja (ip *IntersectionPolicyFcfs) cancelReservation(reservationId types.ReservationId)
-	// 2 - przyspieszanie i hamowanie za pomocą mocy i masy
-	// 3 - usunac niepotrzebny kodzik
-	// 4 - simulationrunner - ostroznie z generowaniem nowych (zmieniac predkosc)
-	// 5 - afterintersection - sprawdzać czy nie zderzy się
-	// 6 - więcej testów
+	for t := range reservation.reservedGrids {
+
+		for i := range reservation.reservedGrids[t] {
+			x := reservation.reservedGrids[t][i].x
+			y := reservation.reservedGrids[t][i].x
+
+			v := ip.reservationTable[ip.tableIndex + reservation.startTs + types.Millisecond(t)][x][y]
+			if v != taken {
+				panic("Oops")
+			}
+
+			ip.reservationTable[ip.tableIndex + reservation.startTs + types.Millisecond(t)][x][y] = free
+		}
+	}
+
+	delete(ip.reservations, reservationId)
 
 }
 
-func (ip *IntersectionPolicyFcfs) calcOccupied() int {
-	calc := 0
-	for t := range ip.reservationTable {
-		for x := range ip.reservationTable[t] {
-			for y := range ip.reservationTable[t][x] {
-				if ip.reservationTable[t][x][y] == taken {
-					calc += 1
-				}
+//func (ip *IntersectionPolicyFcfs) calcOccupied() int {
+//	calc := 0
+//	for t := range ip.reservationTable {
+//		for x := range ip.reservationTable[ip.reservationTableFrom + t] {
+//			for y := range ip.reservationTable[ip.reservationTableFrom + t][x] {
+//				if ip.reservationTable[ip.reservationTableFrom + t][x][y] == taken {
+//					calc += 1
+//				}
+//			}
+//		}
+//	}
+//	return calc
+//}
+
+func (ip *IntersectionPolicyFcfs) relocateTableIfNecessary(ts types.Millisecond) {
+	const size = 1000
+	if (ts / 10) % size != 0 && ts != 0 {
+		return
+	}
+	ip.tableIndex -= size
+
+	for i := size; i < cap(ip.reservationTable); i++ {
+		ip.reservationTable[i - size] = ip.reservationTable[i]
+	}
+
+	for i := cap(ip.reservationTable) - size; i < cap(ip.reservationTable); i++ {
+		for x := range ip.reservationTable[i] {
+			for y := range ip.reservationTable[i][x] {
+				ip.reservationTable[i][x][y] = free
 			}
 		}
 	}
-	return calc
 }
+
 
 func getOccupingGrids(x types.XCoord, y types.YCoord, alpha types.Angle) []grid {
 	res := []grid{}
@@ -372,13 +429,15 @@ func getOccupingGrids(x types.XCoord, y types.YCoord, alpha types.Angle) []grid 
 	leftRearX := x + r*math.Cos(math.Pi-leftRear)
 	leftRearY := y - r*math.Cos(math.Pi/2-leftRear)
 
-	drawRectange := func(x1 int, y1 int, x2 int, y2 int, x3 int, y3 int, x4 int, y4 int) {
+	const marginMeters = 0.25
+	margin := int(math.Floor(marginMeters / gridSize)) // [m] -> pixels
+	drawRectange := func(x1, y1, x2, y2, x3, y3, x4, y4 int) {
 
-		minx := min(x1, x2, x3, x4) - 10
-		maxx := max(x1, x2, x3, x4) + 10
+		minx := min(x1, x2, x3, x4) - margin
+		maxx := max(x1, x2, x3, x4) + margin
 
-		miny := min(y1, y2, y3, y4) - 10
-		maxy := max(y1, y2, y3, y4) + 10
+		miny := min(y1, y2, y3, y4) - margin
+		maxy := max(y1, y2, y3, y4) + margin
 
 		if minx == 0 || miny == 0 {
 			return
@@ -386,7 +445,6 @@ func getOccupingGrids(x types.XCoord, y types.YCoord, alpha types.Angle) []grid 
 
 		for x := minx; x <= maxx; x++ {
 			for y := miny; y <= maxy; y++ {
-				// FIXME - to troche inaczej trzeba liczyć
 				if x < 0 || y < 0 || x >= gridNoX || y >= gridNoY {
 					continue
 				}
@@ -419,6 +477,6 @@ func getAlpha(xFrom types.XCoord, yFrom types.YCoord, xTo types.XCoord, yTo type
 	case yDiff == 0 && xDiff < 0:
 		return math.Pi
 	default:
-		panic("Oops")
+		return math.Atan(-yDiff / xDiff)
 	}
 }

@@ -8,27 +8,26 @@ import (
 const filePath = "../simulation.conf"
 
 type Configuration struct {
-	SimulationName string
 	VehiclesPerMinute int32
 	IntersectionPolicy string
 	SimulationDuration time.Duration
-	VehicleMaxAcc types.MetersPerSecond2
-	VehicleMaxDecel types.MetersPerSecond2
 	VehicleMaxSpeed types.MetersPerSecond
+	RandomSeed int64
 }
 
 
 
 func ReadConfiguration() (Configuration, error) {
-	// TODO mocked
-	d, _ := time.ParseDuration("60s")
+	// TODO read from file
+	d, err := time.ParseDuration("120s")
+	if err != nil {
+		panic(err)
+	}
 	return Configuration{
-		SimulationName: "test1",
-		VehiclesPerMinute: 60,
-		IntersectionPolicy: "sequential",
+		VehiclesPerMinute: 120,
+		IntersectionPolicy: "fcfs",
 		SimulationDuration: d,
 		VehicleMaxSpeed: 10,
-		VehicleMaxAcc: 2.0,
-		VehicleMaxDecel: 3.5,
+		RandomSeed: 42,
 	}, nil
 }

@@ -12,39 +12,39 @@ import (
 
 func TestReservationTable(t *testing.T) {
 
-	fcfs := CreateIntersectionPolicyFcfs(nil, util.Configuration{})
+	graph := &util.Graph{
+		ConflictZone: util.ConflictZone{
+			MinX: 0,
+			MaxX: 40,
+			MinY: 0,
+			MaxY: 40,
+		},
+	}
+
+	fcfs := CreateIntersectionPolicyFcfs(graph, util.Configuration{})
 
 	for counter := 0; counter < 100; counter++ {
 
-		//fcfs.appendToReservationTable(nil)
-
 		colors := []color.Color{color.Black, color.White}
-		rect := image.Rect(0, 0, fcfs.gridNoX, fcfs.gridNoY)
+		rect := image.Rect(0, 0, gridNoX, gridNoY)
 		newFrame := image.NewPaletted(rect, colors)
-		for x := range fcfs.reservationTable {
-			for y := range fcfs.reservationTable[x] {
-				if fcfs.reservationTable[0][x][y] == taken {
-					for xx := -5; xx < 5; xx++ {
-						for yy := -5; yy < 5; yy++ {
-							if x + xx < 0 || y + yy < 0 {
-								continue
-							}
-							if x + xx >= fcfs.gridNoX || y + yy >= fcfs.gridNoY {
-								continue
-							}
-							newFrame.Set(x + xx, fcfs.gridNoY - (y + yy) , color.Black)
-						}
+		for x := range fcfs.reservationTable[counter] {
+			for y := range fcfs.reservationTable[counter][x] {
+				if fcfs.reservationTable[counter][x][y] == taken {
+					if x  < 0 || y < 0 {
+						continue
 					}
+					if x >= gridNoX || y >= gridNoY {
+						continue
+					}
+					newFrame.Set(x, gridNoY - y , color.Black)
 				} else {
-					newFrame.Set(x, fcfs.gridNoY - y, color.White)
+					newFrame.Set(x, gridNoY - y, color.White)
 				}
 			}
 		}
 
 		f, _ := os.Create(fmt.Sprintf("img/image%05d.png", counter))
-		err := png.Encode(f, newFrame)
-		if err != nil {
-			panic(err)
-		}
+		png.Encode(f, newFrame)
 	}
 }

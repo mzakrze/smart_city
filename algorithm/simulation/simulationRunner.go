@@ -70,11 +70,10 @@ func (r *SimulationRunner) RunSimulation() {
 	}
 	simulationFinished := func() bool {
 		return simulationDurationElapsed() &&
-			//r.allVehiclesProxy.AllVehiclesDone() &&
 			isFullSecond()
 	}
 
-	r.resultsLogger.SimulationStarted(r.configuration.SimulationName, time.Now())
+	r.resultsLogger.SimulationStarted(time.Now())
 
 	for simulationFinished() == false {
 
@@ -110,21 +109,10 @@ func (r *SimulationRunner) RunSimulation() {
 func (r *SimulationRunner) spawnNewVehicles(ts types.Millisecond) []*vehicle.VehicleActor {
 	spawned := []*vehicle.VehicleActor{}
 
-	toSpawn, _ := int(r.configuration.VehiclesPerMinute / 60), r.configuration.VehiclesPerMinute % 60
-	//if int(remainder) < rand.Intn(60) { // TODO
-	//	toSpawn += 1
-	//}
-
-	//if toSpawn > 0 {
-	//	toSpawn = 1
-	//	r.configuration.VehiclesPerMinute = 0
-	//}
-
-	//if len(r.allVehiclesProxy.GetAllVehicles()) == 0 {
-	//	toSpawn = 1
-	//} else {
-	//	toSpawn = 0
-	//}
+	toSpawn, remainder := int(r.configuration.VehiclesPerMinute / 60), r.configuration.VehiclesPerMinute % 60
+	if int(remainder) > rand.Intn(60) {
+		toSpawn += 1
+	}
 
 	for i := 0; i < toSpawn; i++ {
 		newVehicle := r.createRandomVehicleIfEntryPointAvailable(ts)
@@ -186,7 +174,7 @@ func (r *SimulationRunner) createRandomVehicleIfEntryPointAvailable(ts types.Mil
 		return nil // no available entrypoint - cannot generate new vehicle
 	}
 	// given a (deceleration) and s (braking distance), what is max v (speed)?
-	initSpeed := math.Min(r.configuration.VehicleMaxSpeed, math.Sqrt(2.0 * distance * r.configuration.VehicleMaxDecel)) * 0.8
+	initSpeed := math.Min(r.configuration.VehicleMaxSpeed, math.Sqrt(2 * distance * constants.VehicleBrakingForce / constants.Vehicleweight) * 0.5) * 0.8
 
 	exitpoint := getRandomCompatibleExitpoint(entrypoint)
 

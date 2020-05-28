@@ -6,8 +6,8 @@ import (
 )
 
 type IntersectionPolicy interface {
-	ProcessMsg(message *DsrcV2RMessage)
-	GetReplies(millisecond types.Millisecond) []*DsrcR2VMessage
+	ProcessMsg(message DsrcV2RMessage)
+	GetReplies(millisecond types.Millisecond) []DsrcR2VMessage
 }
 
 var instance *IntersectionManager = nil

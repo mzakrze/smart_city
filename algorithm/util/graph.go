@@ -1,8 +1,10 @@
 package util
 
 import (
+	"algorithm/constants"
 	"algorithm/types"
 	"encoding/json"
+	"fmt"
 	"math"
 
 	"io/ioutil"
@@ -79,9 +81,9 @@ type conflictZoneRaw struct {
 	MaxY float64
 }
 
-func ReadGraph(simName, host string) (*Graph, error) {
+func ReadGraph(host string) (*Graph, error) {
 	client := &http.Client{}
-	resp, err := client.Get("http://" + host + ":9200/simulation-info/_doc/" + simName)
+	resp, err := client.Get("http://" + host + ":9200/simulation-info/_doc/" + constants.SimulationName)
 	if err != nil {
 		panic(err)
 	}
@@ -89,6 +91,7 @@ func ReadGraph(simName, host string) (*Graph, error) {
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
+		fmt.Println("Error while reading graph, probably Elasticsearch is down")
 		panic(err)
 	}
 
@@ -99,13 +102,15 @@ func ReadGraph(simName, host string) (*Graph, error) {
 	}{}
 	err = json.Unmarshal([]byte(body), &respObject)
 	if err != nil {
-		return nil, err
+		fmt.Println("Error while reading graph, probably there is no data in Elasticsearch")
+		panic(err)
 	}
 
 	graphObj := graphRaw{}
 	err = json.Unmarshal([]byte(respObject.Source.GraphRaw), &graphObj)
 	if err != nil {
-		return nil, err
+		fmt.Println("Error while reading graph, probably there is no data in Elasticsearch")
+		panic(err)
 	}
 
 	graph := Graph{}

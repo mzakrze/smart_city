@@ -61,14 +61,14 @@ func CommunicationLayerSingleton(proxy *AllVehicleProxy) *CommunicationLayer {
 	if instanceCommunication == nil {
 		instanceCommunication = &CommunicationLayer{
 			proxy: proxy,
-			vehicleToReceive: make(map[types.VehicleId][]*DsrcR2VMessage),
-			vehicleToReceiveV2V: make(map[types.VehicleId][]*DsrcV2VMessage),
+			vehicleToReceive: make(map[types.VehicleId][]DsrcR2VMessage),
+			vehicleToReceiveV2V: make(map[types.VehicleId][]DsrcV2VMessage),
 		}
 	}
 	return instanceCommunication
 }
 
-func (c *CommunicationLayer) SendDsrcV2V(m *DsrcV2VMessage) {
+func (c *CommunicationLayer) SendDsrcV2V(m DsrcV2VMessage) {
 	for _, v := range c.proxy.GetAllVehicles() {
 		if v.Id == m.sender {
 			continue
@@ -77,34 +77,34 @@ func (c *CommunicationLayer) SendDsrcV2V(m *DsrcV2VMessage) {
 	}
 }
 
-func (c *CommunicationLayer) SendDsrcV2R(m *DsrcV2RMessage) {
+func (c *CommunicationLayer) SendDsrcV2R(m DsrcV2RMessage) {
 	// FIXME - dodać opóźnienie + gubienie
 	c.imToReceive = append(c.imToReceive, m)
 }
 
-func (c *CommunicationLayer) SendDsrcR2V(m *DsrcR2VMessage) {
+func (c *CommunicationLayer) SendDsrcR2V(m DsrcR2VMessage) {
 	// FIXME - dodać opóźnienie + gubienie
 	if _, exists := c.vehicleToReceive[m.receiver]; exists == false {
-		c.vehicleToReceive[m.receiver] = []*DsrcR2VMessage{}
+		c.vehicleToReceive[m.receiver] = []DsrcR2VMessage{}
 	}
 	c.vehicleToReceive[m.receiver] = append(c.vehicleToReceive[m.receiver], m)
 }
 
 
 
-func (c *CommunicationLayer) VehicleReceive(id types.VehicleId) []*DsrcR2VMessage {
+func (c *CommunicationLayer) VehicleReceive(id types.VehicleId) []DsrcR2VMessage {
 	queue := c.vehicleToReceive[id]
 	delete(c.vehicleToReceive, id)
 	return queue
 }
 
-func (c *CommunicationLayer) VehicleReceiveV2V(id types.VehicleId) []*DsrcV2VMessage {
+func (c *CommunicationLayer) VehicleReceiveV2V(id types.VehicleId) []DsrcV2VMessage {
 	queue := c.vehicleToReceiveV2V[id]
 	delete(c.vehicleToReceiveV2V, id)
 	return queue
 }
 
-func (c *CommunicationLayer) IntersectionManagerReceive() []*DsrcV2RMessage {
+func (c *CommunicationLayer) IntersectionManagerReceive() []DsrcV2RMessage {
 	queue := c.imToReceive
 	rand.Shuffle(len(queue), func(i, j int) {
 		el := queue[i]
@@ -112,7 +112,7 @@ func (c *CommunicationLayer) IntersectionManagerReceive() []*DsrcV2RMessage {
 		queue[j] = el
 
 	})
-	c.imToReceive = []*DsrcV2RMessage{}
+	c.imToReceive = []DsrcV2RMessage{}
 	return queue
 }
 
@@ -120,9 +120,9 @@ func (c *CommunicationLayer) IntersectionManagerReceive() []*DsrcV2RMessage {
 var instanceCommunication *CommunicationLayer = nil
 type CommunicationLayer struct {
 	proxy *AllVehicleProxy
-	vehicleToReceive map[types.VehicleId][]*DsrcR2VMessage
-	vehicleToReceiveV2V map[types.VehicleId][]*DsrcV2VMessage
-	imToReceive []*DsrcV2RMessage
+	vehicleToReceive map[types.VehicleId][]DsrcR2VMessage
+	vehicleToReceiveV2V map[types.VehicleId][]DsrcV2VMessage
+	imToReceive []DsrcV2RMessage // FIXME slice pointerów, czy pointer do slice?
 }
 
 

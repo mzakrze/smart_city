@@ -6,10 +6,11 @@ import (
 	"algorithm/util"
 	"algorithm/vehicle"
 	"flag"
+	"fmt"
 	"github.com/fluent/fluent-logger-golang/fluent"
+	"github.com/cheggaaa/pb/v3"
 	"math/rand"
-	"net/http"
-	"net/url"
+	"time"
 )
 
 func main() {
@@ -25,14 +26,17 @@ func main() {
 		fluentHost = "localhost"
 	}
 
-	//rand.Seed(time.Now().Unix())
-	rand.Seed(18)
+	util.ClearOldIndicesInElastic(elasticHost)
 
-	pruneOldIndicesInElastic(elasticHost)
+	configuration, err := util.ReadConfiguration(); if err != nil { panic(err) }
+	if configuration.RandomSeed != 0 {
+		rand.Seed(configuration.RandomSeed)
+	} else {
+		rand.Seed(time.Now().Unix())
+	}
 
 	// create dependencies
-	configuration, err := util.ReadConfiguration(); if err != nil { panic(err) }
-	graph, err := util.ReadGraph(configuration.SimulationName, elasticHost); if err != nil { panic(err) }
+	graph, err := util.ReadGraph(elasticHost); if err != nil { panic(err) }
 	allVehiclesProxy := vehicle.AllVehiclesProxySingleton()
 	communicationLayer := vehicle.CommunicationLayerSingleton(allVehiclesProxy)
 	sensorLayer := vehicle.SensorLayerSingleton(allVehiclesProxy, graph)
@@ -62,85 +66,26 @@ func main() {
 	simulationRunner.RunSimulation()
 
 
-
-
+	fmt.Println("Simulation finished")
+	fmt.Println()
 }
 
 
 func runProgressTracker(s *simulation.SimulationRunner, c *util.Configuration) {
 
-	//ctx := context.Background()
-	//s := `Now that's what I call progress`
-	//r := progress.NewReader(strings.NewReader("100"))
-	//go func() {
-	//	progressChan := progress.NewTicker(ctx, r, 100, 1*time.Second)
-	//	<-progressChan
-	//	for p := <-progressChan; ; {
-	//		fmt.Printf("\r%v remaining...",
-	//			p.Remaining().Round(time.Second))
-	//	}
-	//	fmt.Println("\rdownload is completed")
-	//}()
+	seconds := int(c.SimulationDuration.Seconds())
 
-	//bar := pb.StartNew(100)
-	//
-	//for true {
-	//	time.Sleep(time.Millisecond * 500)
-	//	p := int64(float64(s.CurrentTs) / (c.SimulationDuration.Seconds() * 1000) * 100)
-	//	if p > bar.Current() {
-	//		bar.Increment()
-	//	}
-	//	if p == 100 {
-	//		break
-	//	}
-	//}
-	//bar.Finish()
+	bar := pb.StartNew(seconds)
 
+	for int(s.CurrentTs) < seconds * 1000 {
+		time.Sleep(time.Millisecond * 500)
+
+		for bar.Current() <= int64(s.CurrentTs / 1000) {
+			bar.Increment()
+		}
+
+	}
+
+	bar.Finish()
 }
 
-
-func pruneOldIndicesInElastic(host string) {
-	client := &http.Client{}
-
-	urlLog := &url.URL{
-		Scheme:  "http",
-		Host: host + ":9200",
-		Path: "simulation-map",
-	}
-
-	urlMap := &url.URL{
-		Scheme:  "http",
-		Host: host + ":9200",
-		Path: "simulation-vehicle",
-	}
-
-	urlTrip := &url.URL{
-		Scheme:  "http",
-		Host: host + ":9200",
-		Path: "simulation-intersection",
-	}
-
-	_, err := client.Do(&http.Request{
-		Method: http.MethodDelete,
-		URL: urlLog,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = client.Do(&http.Request{
-		Method: http.MethodDelete,
-		URL: urlMap,
-	})
-	if err != nil {
-		panic(err)
-	}
-
-	_, err = client.Do(&http.Request{
-		Method: http.MethodDelete,
-		URL: urlTrip,
-	})
-	if err != nil {
-		panic(err)
-	}
-}

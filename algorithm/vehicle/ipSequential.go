@@ -13,7 +13,7 @@ type IntersectionPolicySequential struct {
 	graph                   *util.Graph
 	nextReservationId		types.ReservationId
 	reservations			[]ipReservation
-	replies					[]*DsrcR2VMessage
+	replies					[]DsrcR2VMessage
 }
 
 
@@ -37,11 +37,11 @@ func CreateIntersectionPolicySequential(graph *util.Graph) *IntersectionPolicySe
 		nextReservationId: 1,
 		vehicleToFirstRequestTs: make(map[types.VehicleId]types.Millisecond),
 		reservations: make([]ipReservation, 0),
-		replies: make([]*DsrcR2VMessage, 0),
+		replies: make([]DsrcR2VMessage, 0),
 	}
 }
 
-func (ip * IntersectionPolicySequential) ProcessMsg(m *DsrcV2RMessage) {
+func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
 
 	if m.MsgType == AimProtocolMsgReservationCancelation {
 		index := math.MinInt32
@@ -60,6 +60,8 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m *DsrcV2RMessage) {
 
 	arriveTs, leaveTs, arriveSpeed, tsToSpeed := ip.calculateRouteForRequest(m)
 
+
+
 	if ip.isReserved(arriveTs, leaveTs) {
 		//panic("Sth not ok")
 		return
@@ -73,7 +75,7 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m *DsrcV2RMessage) {
 
 	ip.assertReservationsDontOverlap()
 
-	offer := &DsrcR2VMessage{
+	offer := DsrcR2VMessage{
 		msgType: AimProtocolMsgAllow,
 		receiver: m.Sender,
 		reservationFromTs: arriveTs,
@@ -106,7 +108,7 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m *DsrcV2RMessage) {
 }
 
 
-func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*DsrcR2VMessage {
+func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []DsrcR2VMessage {
 	//if ip.nextAvailableTs - ts > 0 {
 	//	// we still have time to make a decision
 	//	return []*DsrcR2VMessage{}
@@ -146,10 +148,10 @@ func (ip *IntersectionPolicySequential) GetReplies(ts types.Millisecond) []*Dsrc
 
 	if ts % 10 == 0 {
 		res := ip.replies
-		ip.replies = []*DsrcR2VMessage{}
+		ip.replies = []DsrcR2VMessage{}
 		return res
 	} else {
-		return []*DsrcR2VMessage{}
+		return []DsrcR2VMessage{}
 	}
 
 }
@@ -205,8 +207,8 @@ func (ip *IntersectionPolicySequential) scoreRequest(message *DsrcV2RMessage) fl
 	return res
 }
 
-func (ip *IntersectionPolicySequential) distanceOnConflictZone(msg *DsrcV2RMessage) types.Meter {
-	switch ip.getTurnDirection(msg) {
+func (ip *IntersectionPolicySequential) distanceOnConflictZone(msg DsrcV2RMessage) types.Meter {
+	switch ip.getTurnDirection(&msg) {
 	case straight:
 		x := msg.ConflictZoneNodeEnter.X - msg.ConflictZoneNodeExit.X
 		y := msg.ConflictZoneNodeEnter.Y - msg.ConflictZoneNodeExit.Y
@@ -215,13 +217,13 @@ func (ip *IntersectionPolicySequential) distanceOnConflictZone(msg *DsrcV2RMessa
 	case left:
 		fallthrough
 	case right:
-		return 2.0 * math.Pi * ip.getTurnRadius(msg) / 4.0
+		return 2.0 * math.Pi * ip.getTurnRadius(&msg) / 4.0
 	default:
 		panic("oops")
 	}
 }
 
-func (ip *IntersectionPolicySequential) calculateRouteForRequest(req *DsrcV2RMessage) (types.Millisecond, types.Millisecond, types.MetersPerSecond, map[types.Millisecond]types.MetersPerSecond) {
+func (ip *IntersectionPolicySequential) calculateRouteForRequest(req DsrcV2RMessage) (types.Millisecond, types.Millisecond, types.MetersPerSecond, map[types.Millisecond]types.MetersPerSecond) {
 	approachConflictZoneSpeed := req.ApproachConflictZoneSpeed
 	approachConflictZoneTs := req.ApproachConflictZoneMinTs + constants.SimulationStepInterval
 
@@ -230,7 +232,7 @@ func (ip *IntersectionPolicySequential) calculateRouteForRequest(req *DsrcV2RMes
 	speed := approachConflictZoneSpeed
 	accelerateTo := func(limit types.MetersPerSecond) {
 		if speed < limit {
-			speed += maxAcc * (float64(constants.SimulationStepInterval) / 1000.0)
+			speed += velocityDiffStepAccelerating(speed)
 			if speed > limit {
 				speed = limit
 			}
@@ -245,7 +247,7 @@ func (ip *IntersectionPolicySequential) calculateRouteForRequest(req *DsrcV2RMes
 		if req.IsTurning {
 			accelerateTo(req.MaxSpeedOnCurve)
 		} else {
-			accelerateTo(maxSpeedOnConflictZone)
+			accelerateTo(constants.VehicleMaxSpeedOnConflictZone)
 		}
 	}
 

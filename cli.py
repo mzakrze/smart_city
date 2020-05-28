@@ -9,6 +9,8 @@ import requests
 import json
 import time
 import os
+import subprocess
+import shlex
 
 simulation_name = "simulation"
 
@@ -28,11 +30,11 @@ class Config:
 def read_args():
     parser = argparse.ArgumentParser(description='Runs simulation')
 
-    parser.add_argument('--config', help='Path to simulation configuration file', required=True)
+    parser.add_argument('configuration_file', help='Path to simulation configuration file')
 
     args = parser.parse_args()
 
-    return args.config
+    return args.configuration_file
 
 def parse_config(path):
     try:
@@ -71,9 +73,19 @@ def delete_old():
     url = 'http://localhost:9200/simulation-info/_doc/' + simulation_name
     r = requests.delete(url)
 
+def run_command(command):
+    process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE)
+    while True:
+        if process.poll() is not None:
+            break
+        output = process.stdout.readline()
+        print(output.strip().decode('UTF-8'))
+    rc = process.poll()
+    return rc
+
 if __name__ == "__main__":
-    print("Reading configuration ...")
     config_path = read_args()
+    print("Reading configuration ...")
     delete_old()
     config, config_raw = parse_config(config_path)
 
@@ -86,8 +98,9 @@ if __name__ == "__main__":
     os.system("docker build -t simulation_algorithm . -q")
 
     print("Running simulation ...")
-    os.system("docker run --network smart_city_efk simulation_algorithm")
+    run_command("docker run --network smart_city_efk simulation_algorithm")
 
-    print("Finished.")
+    print("CLI Finished.")
+    print("Goto: localhost:3000")
 
 

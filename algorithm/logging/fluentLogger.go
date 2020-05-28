@@ -1,6 +1,7 @@
 package logging
 
 import (
+	"algorithm/constants"
 	"algorithm/types"
 	"encoding/json"
 	"fmt"
@@ -60,8 +61,7 @@ func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Mete
 	return instance
 }
 
-func (f *ResultsLogger) SimulationStarted(simName string, startTime time.Time) {
-	f.simulationName = simName
+func (f *ResultsLogger) SimulationStarted(startTime time.Time) {
 	f.simulationStartTime = startTime
 }
 func (f *ResultsLogger) SimulationFinished(finishTime time.Time) {
@@ -109,7 +109,6 @@ var instance *ResultsLogger = nil
 type ResultsLogger struct {
 	logger IResultLogger
 
-	simulationName       string
 	simulationStartTime  time.Time
 	simulationFinishTime time.Time
 	maxTs                int
@@ -186,7 +185,7 @@ func (f *ResultsLogger) appendToVehicleLog(step int, id types.VehicleId, speed t
 func (f *ResultsLogger) sendInfoLog() {
 	throughput := int(float64(f.vehiclesFinishedThroughput) * 60 / f.simulationDurationSeconds) // per minute - hence "* 60"
 	msg := map[string]string {
-		"simulation_name": f.simulationName,
+		"simulation_name": constants.SimulationName,
 		"simulation_started_ts": fmt.Sprintf("%d", f.simulationStartTime.Second()),
 		"simulation_finished_ts": fmt.Sprintf("%d", f.simulationFinishTime.Second()),
 		"simulation_max_ts": fmt.Sprintf("%d", f.maxTs),
@@ -213,7 +212,7 @@ func (f *ResultsLogger) sendMapLogAndFlush(vId types.VehicleId) {
 	stateJson := string(bytesState)
 
 	msg := map[string]string {
-		"simulation_name": f.simulationName,
+		"simulation_name": constants.SimulationName,
 		"vehicle_id": fmt.Sprintf("%d", vId),
 		"second": fmt.Sprintf("%d", f.currentSecond),
 		"location_array": locationJson,
@@ -230,7 +229,7 @@ func (f *ResultsLogger) sendMapLogAndFlush(vId types.VehicleId) {
 func (f *ResultsLogger) sendIntersectionLog() {
 	for sec := types.Second(0); sec <= f.currentSecond; sec++ {
 		msg := map[string]string {
-			"simulation_name": f.simulationName,
+			"simulation_name": constants.SimulationName,
 			"second": fmt.Sprintf("%d", sec),
 			"arrive_no": fmt.Sprintf("%d", f.intersectionLogVehiclesArrive[sec]),
 			"leave_no": fmt.Sprintf("%d", f.intersectionLogVehiclesLeave[sec]),
@@ -256,7 +255,7 @@ func (f *ResultsLogger) sendVehicleLogAndFlush(id types.VehicleId, leaveTs types
 	speedJson := string(bytesSpeed)
 
 	msg := map[string]string{
-		"simulation_name": f.simulationName,
+		"simulation_name": constants.SimulationName,
 		"vehicle_id": fmt.Sprintf("%d", id),
 		"start_time": fmt.Sprintf("%d", arriveTs),
 		"finish_time": fmt.Sprintf("%d", leaveTs),
@@ -275,7 +274,7 @@ func (f *ResultsLogger) sendVehicleLogAndFlush(id types.VehicleId, leaveTs types
 func (f *ResultsLogger) sendVehicleStepReport(id types.VehicleId, ts types.Millisecond, xCoord types.XCoord, yCoord types.YCoord, speed types.MetersPerSecond, acc types.MetersPerSecond2) {
 	// FIXME - nie jest otestowane
 	msg := map[string]string {
-		"simulation_name": f.simulationName,
+		"simulation_name": constants.SimulationName,
 		"vehicle_id": fmt.Sprintf("%d", id),
 		"speed": fmt.Sprintf("%f", speed),
 		"acc": fmt.Sprintf("%f", acc),

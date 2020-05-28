@@ -9,7 +9,8 @@ class TimeController extends React.Component {
             min: null,
             max: null,
             simulation_progress: 0,
-            initialized: false
+            initialized: false,
+            simulationRun: false,
         };
     }
 
@@ -40,20 +41,20 @@ class TimeController extends React.Component {
     renderPlayButton() {
         let handle = () => {
             this.props.notifyStartSimulation(this.state.min, this.state.max);
+            this.setState({
+                simulationRun: true,
+            })
         }
-        if (this.state.initialized) {
-            return <button type="button" onClick={handle}>Play</button>
+        if (this.state.initialized && this.state.simulationRun == false) {
+             return <button type="button" onClick={handle}>Play simulation</button>
         } else {
-            return <button type="button" disabled="true">Play</button>
+            return <button type="button" disabled="true">Play simulation</button>
         }
     }
 
     render() {
         return <div>
-            <h1> Hi, it works max = {this.state.max}, min = {this.state.min} </h1>
-            <input type="range" min="1" max="100" class="slider" id="myRange" />
             {this.renderPlayButton()}
-            <button type="button">Pause</button>
         </div>
     }
 
