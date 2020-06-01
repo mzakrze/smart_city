@@ -4,7 +4,7 @@
 
 ```
 $ docker-compose up --build -d
-$ ./cli.py --config simulation.conf
+$ ./cli.py simulation.conf
 ```
 
 Go to localhost:3000
