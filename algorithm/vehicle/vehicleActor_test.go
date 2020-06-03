@@ -214,3 +214,105 @@ func doTestFollowsReservationIngoreFirstNRequests(n int, t *testing.T) {
 		}
 	}
 }
+
+
+
+func TestPlatooningReservation(t *testing.T) {
+	const v2AppearsTs = 1000
+	const v1PlatooningReservationId = 42
+	roadGraph := generateSimpleRoad()
+	p := AllVehiclesProxySingleton()
+	s := SensorLayerSingleton(p, roadGraph)
+	nc := CommunicationLayerSingleton(p, util.Configuration{})
+
+	v1 := NewVehicleActor(1, 0, &roadGraph.AllNodes[0], &roadGraph.AllNodes[3], 10, roadGraph, s, nc)
+	v2 := NewVehicleActor(2, v2AppearsTs, &roadGraph.AllNodes[0], &roadGraph.AllNodes[3], 10, roadGraph, s, nc)
+
+	p.RegisterVehicle(v1)
+	p.RegisterVehicle(v2)
+
+	handleRequest := func (vId types.VehicleId, ts types.Millisecond, req DsrcV2RMessage) DsrcR2VMessage {
+		const distOnConflictZone = 20.0
+		tTotal := req.ApproachConflictZoneMinTs + types.Millisecond(distOnConflictZone / req.ApproachConflictZoneSpeed * 1000)
+		if tTotal % 10 != 0 {
+			tTotal = tTotal - tTotal % 10 + 10
+		}
+
+		plan := make(map[types.Millisecond]types.MetersPerSecond)
+		for t := types.Millisecond(req.ApproachConflictZoneMinTs); t <= tTotal; t += constants.SimulationStepInterval {
+			plan[t] = req.ApproachConflictZoneSpeed
+		}
+
+		response := DsrcR2VMessage{
+			msgType:                 AimProtocolMsgAllow,
+			reservationId:           v1PlatooningReservationId,
+			tsSent:                  ts,
+			receiver:                vId,
+			reservationFromTs:       req.ApproachConflictZoneMinTs,
+			reservationToTs:         tTotal,
+			reservationDesiredSpeed: req.ApproachConflictZoneSpeed,
+			reservationTsToSpeed:    plan,
+		}
+
+		return response
+	}
+
+	v1ReponseReceived := false
+	v2SentPlatooningRequest := false
+	for ts := types.Millisecond(0); ts < 20 * 10e3; ts += constants.SimulationStepInterval {
+		v1.Ping(ts)
+		if ts >= v2AppearsTs {
+			v2.Ping(ts)
+		}
+
+		if v1.State != beforeIntersectionNotAllowed {
+			v1ReponseReceived = true
+		}
+
+		requests := nc.IntersectionManagerReceive(ts)
+		for i := range requests {
+			r := requests[i]
+			if r.Sender == 1 {
+				if r.MsgType == AimProtocolMsgReservationInfo {
+					if v1ReponseReceived == false {
+						t.Fatal("V1 sent broadcast before got reservation")
+					}
+				} else if r.MsgType == AimProtocolMsgRequest {
+					if v1.Speed < 100 {
+						v1Response := handleRequest(v1.Id, ts, r)
+						nc.SendDsrcR2V(v1Response)
+					}
+				}
+			}
+			if r.Sender == 2 {
+				if r.MsgType == AimProtocolMsgRequest {
+					if (v1.State == beforeIntersectionNotAllowed || v1.State == beforeIntersectionHasReservation) && v1ReponseReceived == false {
+						t.Fatal("V1 cannot send request without v2 xbroadcasting")
+					}
+					if v2SentPlatooningRequest && r.PlatooningReservationId != v1PlatooningReservationId {
+						t.Error("Vehicle 2 should have send platooning reservation request")
+					}
+					v2SentPlatooningRequest = true
+
+					v2Response := handleRequest(v2.Id, ts, r)
+					nc.SendDsrcR2V(v2Response)
+				}
+			}
+		}
+	}
+
+	if v1.State  != afterIntersection {
+		t.Error(fmt.Sprintf("v1.State is: %d, should be: %d\n", v1.State, afterIntersection))
+	}
+	if v2.State != afterIntersection {
+		t.Error(fmt.Sprintf("v2.State is: %d, should be: %d\n", v2.State, afterIntersection))
+	}
+	if v1ReponseReceived == false {
+		t.Error("v1ReponseReceived is false")
+	}
+	if v2SentPlatooningRequest== false {
+		t.Error("v2SentPlatooningRequest is false")
+	}
+}
+
+

@@ -78,7 +78,6 @@ func (ip * IntersectionPolicyFcfs) ProcessMsg(m DsrcV2RMessage) {
 	if success == false {
 		return
 	}
-
 }
 
 func (ip *IntersectionPolicyFcfs) GetReplies(ts types.Millisecond) []DsrcR2VMessage {
@@ -332,6 +331,7 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 	ip.nextReservationId += 1
 
 	reply := DsrcR2VMessage{
+		reservationId: ip.nextReservationId,
 		msgType: AimProtocolMsgAllow,
 		receiver: msg.Sender,
 		reservationFromTs: reservationFromTs,
@@ -340,8 +340,11 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 		reservationTsToSpeed: reservationTsToSpeed,
 	}
 
+	ip.nextReservationId += 1
 	ip.reservations[reservation.reservationId] = reservation
 	ip.replies = append(ip.replies, reply)
+
+
 
 	return true
 }

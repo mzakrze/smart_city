@@ -68,13 +68,14 @@ func (v *VehicleActor) Ping(ts types.Millisecond) {
 	v.checkForMessages(ts)
 
 	if v.State == beforeIntersectionNotAllowed {
-		if v.isFirstToConflictZone() {
-			if ts - v.lastMsgSentTs > 50 {
+		if ts - v.lastMsgSentTs > 50 {
+			if v.isFirstToConflictZone() {
 				v.sendRequestReservation(ts)
 				v.lastMsgSentTs = ts
+			} else if v.platooningReservation != nil {
+				v.sendRequestReservationPlatooning(ts)
+				v.lastMsgSentTs = ts
 			}
-		} else {
-			v.sendRequestPermissionPlatooning(ts)
 		}
 	}
 
@@ -193,11 +194,6 @@ func (v *VehicleActor) checkForMessages(ts types.Millisecond) {
 	for _, m := range messages {
 		switch m.msgType {
 		case AimProtocolMsgAllow:
-			if v.isFirstToConflictZone() == false {
-				//panic("Oops")
-				fmt.Println("Error: vId=", v.Id, " got reservation but is not first")
-			}
-
 			reservation := &reservation{
 				reservationId: m.reservationId,
 				arriveConflictZoneTs: m.reservationFromTs,
@@ -220,11 +216,9 @@ func (v *VehicleActor) checkForMessages(ts types.Millisecond) {
 					MsgType:               AimProtocolMsgReservationCancelation,
 					ReservationToCancelId: m.reservationId,
 				}
-				//fmt.Println("Cancelling reservation")
 				v.networkCard.SendDsrcV2R(reply)
 			} else {
 				v.State = beforeIntersectionHasReservation
-				v.sendReservationInfoBroadcast(ts, reservation, v.hipotheticalPlan)
 				v.reservation = reservation
 				v.approachConflictZoneHasReservationPlan = v.hipotheticalPlan
 				for t := ts; true; t += constants.SimulationStepInterval {
@@ -232,16 +226,31 @@ func (v *VehicleActor) checkForMessages(ts types.Millisecond) {
 					if e == false {
 						break
 					}
-					//fmt.Println(v.approachConflictZoneHasReservationPlan[t])
 				}
-				//fmt.Println("=----------------------------")
+
+				broadcastInfo := DsrcV2VMessage{
+					msgType: AimProtocolMsgReservationInfo,
+					sender: v.Id,
+					tsSent: ts,
+					reservationId: reservation.reservationId,
+					arriveConflictZoneTs: reservation.arriveConflictZoneTs,
+					arriveConflictZoneSpeed: reservation.arriveConflictZoneSpeed,
+					approachConflictZonePlan: v.approachConflictZoneHasReservationPlan,
+					x: v.X,
+					y: v.Y,
+				}
+				v.networkCard.SendDsrcV2V(broadcastInfo)
 			}
 		}
 	}
 
-	for _, m := range v.networkCard.VehicleReceiveV2V(ts, v.Id) {
+	msgs := v.networkCard.VehicleReceiveV2V(ts, v.Id)
+	for _, m := range msgs {
 		switch m.msgType {
 		case AimProtocolMsgReservationInfo:
+			if v.State != beforeIntersectionNotAllowed {
+				continue
+			}
 			_, vId := v.sensor.ScanVehiclesAhead(v)
 			if vId != m.sender {
 				continue
@@ -330,14 +339,83 @@ func (vehicle *VehicleActor) sendRequestReservation(ts types.Millisecond) {
 	vehicle.hipotheticalPlan = hipotheticalPlan
 }
 
+func (vehicle *VehicleActor) sendRequestReservationPlatooning(ts types.Millisecond) {
+	if vehicle.AlphaInitiated == false {
+		return
+	}
+
+	const continueWithoutReservationTime = 500 // [ms]
+
+	hipotheticalPlan := make(map[types.Millisecond]types.MetersPerSecond)
+
+	// prędkość oraz dystans do conflict zone w oczekiwanym momencie otrzymania pozwolenia
+	_, e := vehicle.approachConflictZoneNoReservationPlan[ts + continueWithoutReservationTime]
+	if e == false {
+		vehicle.planApproachConflictZoneNoReservation(ts)
+	}
+	v0, s1 := calculateDistSpeedAfter(vehicle.approachConflictZoneNoReservationPlan, ts, continueWithoutReservationTime)
+	s := vehicle.calculateDistanceCenterToConflictZone() - s1
+
+	for t := ts; t < ts + continueWithoutReservationTime; t += constants.SimulationStepInterval {
+		hipotheticalPlan[t] = vehicle.approachConflictZoneNoReservationPlan[t]
+	}
+
+	vMax := vehicleMaxSpeedOnConflictZone
+	if vehicle.isTurning() {
+		vMax = vehicle.calculateMaxSpeedOnCurve()
+	}
+
+	t, v, plan, ok := calculateApproachConflictZoneTimeSpeed(v0, s, vMax)
+	t = t - t % 10
+	if ok == false {
+		// TODO
+		//fmt.Println("Vehicle cannot approach conflict zone. v0, s, vMax = ", v0, s, vMax)
+		return
+		//panic("Oops")
+	}
+
+	for th := range plan {
+		hipotheticalPlan[ts + continueWithoutReservationTime + th] = plan[th]
+	}
+
+	{
+		d := vehicle.calculateDistanceCenterToConflictZone()
+		for t0 := ts; t0 < ts + continueWithoutReservationTime + t; t0 += constants.SimulationStepInterval {
+			v0, e := hipotheticalPlan[t0]
+			if e == false {
+				panic("Oops")
+			}
+			d -= v0 * constants.SimulationStepIntervalSeconds
+		}
+	}
+
+	enter, exit := vehicle.conflictZoneNodeEnterExit()
+	msg := DsrcV2RMessage{
+		MsgType:                   AimProtocolMsgRequest,
+		PlatooningReservationId:   vehicle.platooningReservation.reservationId,
+		TsSent:                    ts,
+		Sender:                    vehicle.Id,
+		VehicleX:                  vehicle.X,
+		VehicleY:                  vehicle.Y,
+		VehicleSpeed:              vehicle.Speed,
+		ApproachConflictZoneMinTs: ts + t + continueWithoutReservationTime,
+		ApproachConflictZoneSpeed: v,
+		ConflictZoneNodeEnter:     enter,
+		ConflictZoneNodeExit:      exit,
+		MaxSpeedOnCurve:           vehicle.calculateMaxSpeedOnCurve(),
+		IsTurning:                 vehicle.isTurning(),
+		EntryPointId:              vehicle.entryPoint.Id,
+		ExitPointId:               vehicle.exitPoint.Id,
+		Route:                     vehicle.getRouteCoordinates(),
+	}
+	vehicle.networkCard.SendDsrcV2R(msg)
+	vehicle.hipotheticalPlan = hipotheticalPlan
+}
+
 func (v *VehicleActor) isFirstToConflictZone() bool {
 	d1, _ := v.sensor.ScanVehiclesAhead(v)
 	d2 := v.calculateDistanceCenterToConflictZone()
 	return d1 > d2
-}
-
-func (v *VehicleActor) sendRequestPermissionPlatooning(ts types.Millisecond) {
-	// FIXME - implement this
 }
 
 func (v *VehicleActor) getRouteCoordinates() []types.Location {
@@ -528,10 +606,6 @@ func (v *VehicleActor) calculateDistanceCenterToConflictZone() float64 {
 	}
 
 	return r
-}
-
-func (v *VehicleActor) sendReservationInfoBroadcast(ts types.Millisecond, reservation *reservation, plan map[types.Millisecond]types.MetersPerSecond) {
-	// FIXME - implement this
 }
 
 func (vehicle *VehicleActor) planApproachConflictZoneNoReservation(ts types.Millisecond) {

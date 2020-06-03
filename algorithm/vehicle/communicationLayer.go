@@ -147,6 +147,7 @@ func (c *CommunicationLayer) VehicleReceive(ts types.Millisecond, id types.Vehic
 
 func (c *CommunicationLayer) VehicleReceiveV2V(ts types.Millisecond, id types.VehicleId) []DsrcV2VMessage {
 	res := []DsrcV2VMessage{}
+	//fmt.Println("Before: len(c.messages):", len(c.messages))
 	tmp := c.messages[:0]
 	for i := range c.messages {
 		if c.messages[i].deliveryTs <= ts && c.messages[i].msgLayer == "v2v" && c.messages[i].vehicleReceiverId == id {
@@ -156,6 +157,7 @@ func (c *CommunicationLayer) VehicleReceiveV2V(ts types.Millisecond, id types.Ve
 		}
 	}
 	c.messages = tmp
+	//fmt.Println("After: len(c.messages):", len(c.messages))
 	return res
 }
 
