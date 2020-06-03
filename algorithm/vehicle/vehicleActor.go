@@ -32,6 +32,7 @@ type VehicleActor struct {
 	leaverIntersectionPlan                 map[types.Millisecond]types.MetersPerSecond
 	AlphaInitiated                         bool
 	hipotheticalPlan                       map[types.Millisecond]types.MetersPerSecond
+	lastMsgSentTs                          types.Millisecond
 }
 
 
@@ -52,6 +53,7 @@ func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitp
 		sensor:         sensor,
 		State:          beforeIntersectionNotAllowed,
 		networkCard:    nc,
+		lastMsgSentTs: 	0,
 	}
 
 	v.planRoute()
@@ -67,7 +69,10 @@ func (v *VehicleActor) Ping(ts types.Millisecond) {
 
 	if v.State == beforeIntersectionNotAllowed {
 		if v.isFirstToConflictZone() {
-			v.sendRequestReservation(ts)
+			if ts - v.lastMsgSentTs > 50 {
+				v.sendRequestReservation(ts)
+				v.lastMsgSentTs = ts
+			}
 		} else {
 			v.sendRequestPermissionPlatooning(ts)
 		}
@@ -184,7 +189,7 @@ func (v *VehicleActor) controlVelocity(ts types.Millisecond) {
 
 
 func (v *VehicleActor) checkForMessages(ts types.Millisecond) {
-	messages := v.networkCard.VehicleReceive(v.Id)
+	messages := v.networkCard.VehicleReceive(ts, v.Id)
 	for _, m := range messages {
 		switch m.msgType {
 		case AimProtocolMsgAllow:
@@ -215,7 +220,7 @@ func (v *VehicleActor) checkForMessages(ts types.Millisecond) {
 					MsgType:               AimProtocolMsgReservationCancelation,
 					ReservationToCancelId: m.reservationId,
 				}
-				fmt.Println("Cancelling reservation")
+				//fmt.Println("Cancelling reservation")
 				v.networkCard.SendDsrcV2R(reply)
 			} else {
 				v.State = beforeIntersectionHasReservation
@@ -234,7 +239,7 @@ func (v *VehicleActor) checkForMessages(ts types.Millisecond) {
 		}
 	}
 
-	for _, m := range v.networkCard.VehicleReceiveV2V(v.Id) {
+	for _, m := range v.networkCard.VehicleReceiveV2V(ts, v.Id) {
 		switch m.msgType {
 		case AimProtocolMsgReservationInfo:
 			_, vId := v.sensor.ScanVehiclesAhead(v)
@@ -254,9 +259,6 @@ func (v *VehicleActor) checkForMessages(ts types.Millisecond) {
 
 
 func (vehicle *VehicleActor) sendRequestReservation(ts types.Millisecond) {
-	if ts % 100 != 0 {
-		return
-	}
 	if vehicle.AlphaInitiated == false {
 		return
 	}
@@ -285,9 +287,8 @@ func (vehicle *VehicleActor) sendRequestReservation(ts types.Millisecond) {
 	t, v, plan, ok := calculateApproachConflictZoneTimeSpeed(v0, s, vMax)
 	t = t - t % 10
 	if ok == false {
-		if vehicle.Speed == 0 {
-			fmt.Println("Vehicle with speed 0 cannot approach conflict zone. v0, s, vMax = ", v0, s, vMax)
-		}
+		// TODO
+		//fmt.Println("Vehicle cannot approach conflict zone. v0, s, vMax = ", v0, s, vMax)
 		return
 		//panic("Oops")
 	}
@@ -306,7 +307,6 @@ func (vehicle *VehicleActor) sendRequestReservation(ts types.Millisecond) {
 			d -= v0 * constants.SimulationStepIntervalSeconds
 		}
 	}
-
 
 	enter, exit := vehicle.conflictZoneNodeEnterExit()
 	msg := DsrcV2RMessage{
@@ -339,7 +339,6 @@ func (v *VehicleActor) isFirstToConflictZone() bool {
 func (v *VehicleActor) sendRequestPermissionPlatooning(ts types.Millisecond) {
 	// FIXME - implement this
 }
-
 
 func (v *VehicleActor) getRouteCoordinates() []types.Location {
 	if v.isTurning() {
@@ -510,7 +509,6 @@ func (v *VehicleActor) calculateMaxSpeedOnCurve() types.MetersPerSecond {
 		if radius == 0.0 {
 			fmt.Println("Oops")
 		}
-		//fmt.Println("Max speed on curve:", maxSpeedOnCurve)
 		return maxSpeedOnCurve
 	} else {
 		return math.MaxFloat64
@@ -592,7 +590,7 @@ func calculateDistSpeedAfter(plan map[types.Millisecond]types.MetersPerSecond, t
 
 
 func calculateApproachConflictZoneTimeSpeed(v0, s, v2 float64) (types.Millisecond, float64, map[types.Millisecond]types.MetersPerSecond, bool) {
-	const maxError = 0.1
+	const maxError = 0.2
 
 	var tryTargetVRange func (v_a, v_b float64) (float64, map[types.Millisecond]types.MetersPerSecond, types.Millisecond)
 	depth := 0
@@ -617,13 +615,25 @@ func calculateApproachConflictZoneTimeSpeed(v0, s, v2 float64) (types.Millisecon
 			if math.Abs(sTotal - s) < maxError && currV < v2 {
 				return currV, plan, t
 			}
+
+			if sTotal < s && s < sTotal + currV * constants.SimulationStepIntervalSeconds &&
+				sTotal + currV * constants.SimulationStepIntervalSeconds - s > maxError {
+
+					return tryTargetVRange(v_a, targetV)
+			}
 		}
 
 		for currV > v2 {
 			plan[t] = currV
-			sTotal += currV * constants.SimulationStepIntervalSeconds
 			t += constants.SimulationStepInterval
 			currV -= velocityDiffStepBraking(currV)
+			sTotal += currV * constants.SimulationStepIntervalSeconds
+
+			if sTotal < s && s < sTotal + currV * constants.SimulationStepIntervalSeconds &&
+				sTotal + currV * constants.SimulationStepIntervalSeconds - s > maxError {
+
+				return tryTargetVRange(v_a, targetV)
+			}
 		}
 
 		if math.IsNaN(math.Abs(sTotal - s)) {
@@ -641,7 +651,7 @@ func calculateApproachConflictZoneTimeSpeed(v0, s, v2 float64) (types.Millisecon
 		}
 	}
 
-	finalV, plan, time := tryTargetVRange(v0, 10e2)
+	finalV, plan, time := tryTargetVRange(v0, 100)
 	if plan == nil {
 		return 0, 0, nil, false
 	}

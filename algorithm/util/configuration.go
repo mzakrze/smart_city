@@ -15,6 +15,8 @@ type Configuration struct {
 	VehicleWeight                float64
 	VehicleMaxAngularSpeed        float64
 	VehicleMaxSpeedOnConflictZone float64
+	DsrcMsgLossProbability		  float64
+	DsrcMsgAvgDelay				  int
 }
 
 func ReadConfiguration(filePath string) (Configuration, error) {
@@ -22,13 +24,15 @@ func ReadConfiguration(filePath string) (Configuration, error) {
 	return Configuration{
 		VehiclesPerMinute: 120,
 		IntersectionPolicy: "fcfs",
-		SimulationDuration: 120,
+		SimulationDuration: 30,
 		VehicleMaxSpeed: 10,
 		RandomSeed: 42,
-		VehiclePower: 130,
-		VehicleBrakingForce: 3000.0,
-		VehicleWeight: 1200.0,
+		VehiclePower: 100,
+		VehicleBrakingForce: 4000.0,
+		VehicleWeight: 1500.0,
 		VehicleMaxAngularSpeed: 0.4,
 		VehicleMaxSpeedOnConflictZone: 15.0,
+		DsrcMsgLossProbability: 0.0,
+		DsrcMsgAvgDelay: 0,
 	}, nil
 }

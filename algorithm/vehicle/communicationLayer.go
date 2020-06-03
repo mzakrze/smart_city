@@ -57,74 +57,170 @@ type DsrcV2VMessage struct {
 	y                        types.YCoord
 }
 
+type message struct {
+	msgLayer string
+	deliveryTs types.Millisecond
+	vehicleReceiverId types.VehicleId
+	msgv2r * DsrcV2RMessage
+	msgr2v * DsrcR2VMessage
+	msgv2v * DsrcV2VMessage
+}
+
+
 func CommunicationLayerSingleton(proxy *AllVehicleProxy, configuration util.Configuration) *CommunicationLayer {
 	if instanceCommunication == nil {
 		instanceCommunication = &CommunicationLayer{
 			proxy: proxy,
-			vehicleToReceive: make(map[types.VehicleId][]DsrcR2VMessage),
-			vehicleToReceiveV2V: make(map[types.VehicleId][]DsrcV2VMessage),
+			messages: []message{},
+			deliveryLossProbability: configuration.DsrcMsgLossProbability,
+			deliveryAvgDelay: types.Millisecond(configuration.DsrcMsgAvgDelay),
+			statsLost: 0,
+			statsSent: 0,
+			statsSumDelay: 0,
 		}
 	}
 	return instanceCommunication
 }
 
-func (c *CommunicationLayer) SendDsrcV2V(m DsrcV2VMessage) {
+func (c *CommunicationLayer) SendDsrcV2V(msg DsrcV2VMessage) {
 	for _, v := range c.proxy.GetAllVehicles() {
-		if v.Id == m.sender {
+		if v.Id == msg.sender {
 			continue
 		}
-		c.vehicleToReceiveV2V[v.Id] = append(c.vehicleToReceiveV2V[v.Id], m)
+
+		delay, deliver := c.randLDelayAndDeliveryUpdateStats()
+		if deliver == false {
+			return
+		}
+		m := message{msgv2v: &msg, msgLayer: "v2v", deliveryTs: msg.tsSent + delay, vehicleReceiverId: v.Id}
+		c.messages = append(c.messages, m)
 	}
 }
 
-func (c *CommunicationLayer) SendDsrcV2R(m DsrcV2RMessage) {
-	// FIXME - dodać opóźnienie + gubienie
-	c.imToReceive = append(c.imToReceive, m)
-}
-
-func (c *CommunicationLayer) SendDsrcR2V(m DsrcR2VMessage) {
-	// FIXME - dodać opóźnienie + gubienie
-	if _, exists := c.vehicleToReceive[m.receiver]; exists == false {
-		c.vehicleToReceive[m.receiver] = []DsrcR2VMessage{}
+func (c *CommunicationLayer) SendDsrcV2R(msg DsrcV2RMessage) {
+	delay, deliver := c.randLDelayAndDeliveryUpdateStats()
+	if deliver == false {
+		return
 	}
-	c.vehicleToReceive[m.receiver] = append(c.vehicleToReceive[m.receiver], m)
+	m := message{msgv2r: &msg, msgLayer: "v2r", deliveryTs: msg.TsSent + delay}
+	c.messages = append(c.messages, m)
 }
 
-
-
-func (c *CommunicationLayer) VehicleReceive(id types.VehicleId) []DsrcR2VMessage {
-	queue := c.vehicleToReceive[id]
-	delete(c.vehicleToReceive, id)
-	return queue
+func (c *CommunicationLayer) SendDsrcR2V(msg DsrcR2VMessage) {
+	delay, deliver := c.randLDelayAndDeliveryUpdateStats()
+	if deliver == false {
+		return
+	}
+	m := message{msgr2v: &msg, msgLayer: "r2v", deliveryTs: msg.tsSent + delay, vehicleReceiverId: msg.receiver}
+	c.messages = append(c.messages, m)
 }
 
-func (c *CommunicationLayer) VehicleReceiveV2V(id types.VehicleId) []DsrcV2VMessage {
-	queue := c.vehicleToReceiveV2V[id]
-	delete(c.vehicleToReceiveV2V, id)
-	return queue
+func (c *CommunicationLayer) GetStats() (int, int, types.Millisecond) {
+	avgDelay := types.Millisecond(float64(c.statsSumDelay) / float64(c.statsSent))
+	return c.statsSent, c.statsLost, avgDelay
 }
 
-func (c *CommunicationLayer) IntersectionManagerReceive() []DsrcV2RMessage {
-	queue := c.imToReceive
-	rand.Shuffle(len(queue), func(i, j int) {
-		el := queue[i]
-		queue[i] = queue[j]
-		queue[j] = el
+func (c *CommunicationLayer) randLDelayAndDeliveryUpdateStats() (types.Millisecond, bool) {
+	if float64(rand.Intn(100)) < c.deliveryLossProbability {
+		c.statsLost += 1
+		return 0, false
+	}
+	delay := types.Millisecond(rand.Float64() * 2.0 * float64(c.deliveryAvgDelay))
+	c.statsSent += 1
+	c.statsSumDelay += delay
+	return delay, true
+}
 
-	})
-	c.imToReceive = []DsrcV2RMessage{}
-	return queue
+func (c *CommunicationLayer) VehicleReceive(ts types.Millisecond, id types.VehicleId) []DsrcR2VMessage {
+	res := []DsrcR2VMessage{}
+	tmp := c.messages[:0]
+	for i := range c.messages {
+		if c.messages[i].deliveryTs <= ts && c.messages[i].msgLayer == "r2v" && c.messages[i].vehicleReceiverId == id {
+			res = append(res, *c.messages[i].msgr2v)
+		} else {
+			tmp = append(tmp, c.messages[i])
+		}
+	}
+	c.messages = tmp
+	return res
+}
+
+func (c *CommunicationLayer) VehicleReceiveV2V(ts types.Millisecond, id types.VehicleId) []DsrcV2VMessage {
+	res := []DsrcV2VMessage{}
+	tmp := c.messages[:0]
+	for i := range c.messages {
+		if c.messages[i].deliveryTs <= ts && c.messages[i].msgLayer == "v2v" && c.messages[i].vehicleReceiverId == id {
+			res = append(res, *c.messages[i].msgv2v)
+		} else {
+			tmp = append(tmp, c.messages[i])
+		}
+	}
+	c.messages = tmp
+	return res
+}
+
+func (c *CommunicationLayer) IntersectionManagerReceive(ts types.Millisecond) []DsrcV2RMessage {
+	res := []DsrcV2RMessage{}
+	tmp := c.messages[:0]
+	for i := range c.messages {
+		if c.messages[i].deliveryTs <= ts && c.messages[i].msgLayer == "v2r" {
+			res = append(res, *c.messages[i].msgv2r)
+		} else {
+			tmp = append(tmp, c.messages[i])
+		}
+	}
+	c.messages = tmp
+	return res
 }
 
 
 var instanceCommunication *CommunicationLayer = nil
 type CommunicationLayer struct {
 	proxy *AllVehicleProxy
-	vehicleToReceive map[types.VehicleId][]DsrcR2VMessage
-	vehicleToReceiveV2V map[types.VehicleId][]DsrcV2VMessage
-	imToReceive []DsrcV2RMessage // FIXME slice pointerów, czy pointer do slice?
+	messages []message
+	deliveryLossProbability float64
+	deliveryAvgDelay types.Millisecond
+	statsLost int
+	statsSent int
+	statsSumDelay types.Millisecond
 }
 
 
-
+//func deliveryRatioV2VByDistance(dist types.Meter) int {
+//	if dist < 25 {
+//		return 100
+//	} else if dist < 450 {
+//		// delivery ratio drops linearly from 1 to 0.8 on distance from 25m to 450m
+//		return int(math.Round(100 - 20 * (450  - dist) / 450))
+//	} else {
+//		// then, delivery ratio drops to 0 at around 700 m
+//		return int(math.Max(0, 80 - 80 * (1- (700 - dist) / 700)))
+//	}
+//}
+//
+//func latencyV2VByDistance(dist types.Meter) types.Millisecond {
+//	const min = 15
+//	const max = 25
+//
+//	if dist > 700 {
+//		return max
+//	}
+//
+//	return types.Millisecond(min + (max - min) * (700 - dist) / 700)
+//}
+//
+//func randV2VLatencyAndDrop(dist types.Meter) (types.Millisecond, bool) {
+//	if dist < 0 { panic("illegal argument") }
+//
+//	dropRatio := deliveryRatioV2VByDistance(dist)
+//
+//	if rand.Intn(100) > dropRatio {
+//		// this means we loose this message :(
+//		return 0, false
+//	}
+//
+//	latency := latencyV2VByDistance(dist)
+//
+//	return latency, false
+//}
 

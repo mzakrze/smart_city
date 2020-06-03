@@ -6,6 +6,7 @@ import (
 	"algorithm/types"
 	"algorithm/util"
 	"algorithm/vehicle"
+	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -125,6 +126,12 @@ func (r *SimulationRunner) spawnNewVehicles(ts types.Millisecond) []*vehicle.Veh
 		toSpawn += 1
 	}
 
+	//if len(r.allVehiclesProxy.GetAllVehicles()) == 0 {
+	//	toSpawn = 1
+	//} else {
+	//	toSpawn = 0
+	//}
+
 	for i := 0; i < toSpawn; i++ {
 		newVehicle := r.createRandomVehicleIfEntryPointAvailable(ts)
 		if newVehicle == nil {
@@ -187,7 +194,6 @@ func (r *SimulationRunner) createRandomVehicleIfEntryPointAvailable(ts types.Mil
 	}
 	// given a (deceleration) and s (braking distance), what is max v (speed)?
 	initSpeed := math.Min(r.configuration.VehicleMaxSpeed, math.Sqrt(2 * distance * r.configuration.VehicleBrakingForce / r.configuration.VehicleWeight) * 0.5) * 0.8
-
 	exitpoint := getRandomCompatibleExitpoint(entrypoint)
 
 	vId := r.nextVehicleId
@@ -217,6 +223,9 @@ func (r *SimulationRunner) cleanUpVehicles(ts types.Millisecond) []*vehicle.Vehi
 }
 
 func (r *SimulationRunner) getStatitistics() ShortStats {
+	sent, lost, d := r.communicationLayer.GetStats()
+	fmt.Println("Sent:", sent, ", lost:", lost, ", avgDelay:", d)
+
 	timeToIgnore := types.Millisecond(constants.WarmupSeconds * 1000)
 
 	vehiclesCounter := 0
@@ -232,9 +241,13 @@ func (r *SimulationRunner) getStatitistics() ShortStats {
 		}
 	}
 
+	avgDelay := int(float64(sumDelay) / float64(vehiclesCounter) / 1000)
+	if vehiclesCounter == 0 {
+		avgDelay = 0
+	}
 	return ShortStats{
 		Throughput: vehiclesCounter * 60 / r.configuration.SimulationDuration,
-		AverageDelay: int(float64(sumDelay) / float64(vehiclesCounter) / 1000),
+		AverageDelay: avgDelay,
 	}
 
 }

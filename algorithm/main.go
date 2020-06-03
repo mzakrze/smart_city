@@ -65,7 +65,7 @@ func main() {
 
 
 
-	go runProgressTracker(simulationRunner, &configuration)
+	//go runProgressTracker(simulationRunner, &configuration)
 
 	/* --------------------------- */
 	/* ----- Run Simulation ------ */

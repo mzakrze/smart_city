@@ -64,7 +64,7 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
 
 	if ip.isReserved(arriveTs, leaveTs) {
 		//panic("Sth not ok")
-		return
+		//return
 	}
 
 	ip.reservations = append(ip.reservations, ipReservation{
@@ -73,7 +73,7 @@ func (ip * IntersectionPolicySequential) ProcessMsg(m DsrcV2RMessage) {
 		id: ip.nextReservationId,
 	})
 
-	ip.assertReservationsDontOverlap()
+	//ip.assertReservationsDontOverlap()
 
 	offer := DsrcR2VMessage{
 		msgType: AimProtocolMsgAllow,

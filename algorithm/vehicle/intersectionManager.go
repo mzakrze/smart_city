@@ -36,7 +36,7 @@ func IntersectionManagerSingleton(graph *util.Graph, networkCard *CommunicationL
 }
 
 func (im *IntersectionManager) Ping(ts types.Millisecond) {
-	messages :=im.networkCard.IntersectionManagerReceive()
+	messages :=im.networkCard.IntersectionManagerReceive(ts)
 
 	if im.nextAvailableTs >= ts {
 		return
