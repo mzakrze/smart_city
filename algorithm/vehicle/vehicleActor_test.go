@@ -130,12 +130,13 @@ func TestStopsBeforeIntersection(t *testing.T) {
 
 
 func TestFollowsReservation(t *testing.T) {
-	for n := 0; n < 100; n += 1{
-		doTestFollowsReservationIngoreFirstNRequests(n, t)
-	}
+	//for n := 0; n < 100; n += 1{
+	//	fmt.Println("n=", n)
+		doTestFollowsReservationIngoreFirstNRequests(0, 2, t)
+	//}
 }
 
-func doTestFollowsReservationIngoreFirstNRequests(n int, t *testing.T) {
+func doTestFollowsReservationIngoreFirstNRequests(n int, distToConflictZone types.Meter, t *testing.T) {
 	roadGraph := generateSimpleRoad()
 	p := AllVehiclesProxySingleton()
 	s := SensorLayerSingleton(p, roadGraph)
@@ -171,7 +172,7 @@ func doTestFollowsReservationIngoreFirstNRequests(n int, t *testing.T) {
 
 	reservationSent := false
 	var response DsrcR2VMessage
-	counter := 0
+	//counter := 0
 	for ts := types.Millisecond(0); ts < 2 * 10e3; ts += constants.SimulationStepInterval {
 		v.Ping(ts)
 
@@ -200,13 +201,18 @@ func doTestFollowsReservationIngoreFirstNRequests(n int, t *testing.T) {
 		requests := nc.IntersectionManagerReceive(ts)
 
 		if len(requests) > 0 {
-			if counter == n {
+			if v.Speed == 0 {
 				response = handleRequest(ts, requests[0])
 				nc.SendDsrcR2V(response)
 				reservationSent = true
-			} else {
-				counter += 1
 			}
+			//if counter == n {
+			//	response = handleRequest(ts, requests[0])
+			//	nc.SendDsrcR2V(response)
+			//	reservationSent = true
+			//} else {
+			//	counter += 1
+			//}
 		}
 
 		if ts % 500 == 0 { // some debug msg:
@@ -315,4 +321,56 @@ func TestPlatooningReservation(t *testing.T) {
 	}
 }
 
+func TestCalculateApproachConflictZonePlan(t *testing.T) {
+	cases := []struct {
+		t0 types.Millisecond
+		v0 float64
+		t2 types.Millisecond
+		v2 float64
+		s float64
+		successExpected bool
+	}{
+		{0, 9, 5000, 11, 50,true},
+		{0, 9, 5000, 11, 51,true},
+		{0, 10, 4700, 10, 50,true},
 
+
+		{0, 10, 5100, 10, 50,true},
+		{0, 10, 5200, 10, 50,true},
+	}
+
+	for _, c := range cases {
+		plan, success := calculateApproachConflictZonePlan_fixme(c.t0, c.v0, c.t2, c.v2, c.s)
+
+		if success != c.successExpected {
+			t.Error("Test case failed:", c)
+		}
+
+		if success {
+			for ts := c.t0; ts < c.t2; ts += constants.SimulationStepInterval {
+
+				if ts != c.t0 {
+					before := plan[ts- constants.SimulationStepInterval]
+					after := plan[ts]
+					if after == before {
+
+					} else if after > before {
+						ok := before + velocityDiffStepAccelerating(before) >= after
+						if ok == false {
+							t.Error("Impossible acceleration (from:", before, ", to:", after, ")")
+						}
+					} else {
+						ok := before - velocityDiffStepBraking(before) <= after
+						if ok == false {
+							t.Error("Impossible decelartion (from:", before, ", to:", after, ")")
+						}
+					}
+
+					//fmt.Println(plan[ts])
+				}
+			}
+		}
+
+		_ = plan
+	}
+}

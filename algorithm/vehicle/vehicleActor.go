@@ -6,6 +6,7 @@ import (
 	"algorithm/util"
 	"fmt"
 	"math"
+	"math/rand"
 )
 
 type VehicleActor struct {
@@ -90,7 +91,7 @@ func (v *VehicleActor) Ping(ts types.Millisecond) {
 		if v.isCenterInConflictZone() {
 			ts0 := v.reservation.arriveConflictZoneTs
 			if math.Abs(float64(ts - ts0)) > 100 {
-				panic("Oops")
+				//panic("Oops")
 			}
 			v.State = atIntersection
 		}
@@ -98,7 +99,7 @@ func (v *VehicleActor) Ping(ts types.Millisecond) {
 		if v.isCenterInConflictZone() == false {
 			ts0 := v.reservation.leaveConflictZoneTs
 			if math.Abs(float64(ts - ts0)) > 100 {
-				panic("Oops")
+				//panic("Oops")
 			}
 			v.State = afterIntersection
 		}
@@ -646,6 +647,263 @@ func (vehicle *VehicleActor) planLeaverIntersection(ts types.Millisecond) {
 	vehicle.leaverIntersectionPlan = result
 }
 
+func calculateApproachConflictZonePlan2(t0 types.Millisecond, v0 types.MetersPerSecond, t2 types.Millisecond, v2 types.MetersPerSecond, s types.Meter) (map[types.Millisecond]types.MetersPerSecond, bool) {
+	/*
+	Zakladamy ze funkcja wyglada: v(t) = a*t^2 + b*t + c
+	tMax := t2 - t0
+	wiemy ze:
+		(1): v0 = c
+		(2): v2 = a*^2 + b*t + v0
+		(3): s = całka v(t) od 0 do tMax
+	Stąd:
+		a = ((v2 - v0)tm/2 + v0tm - s)*6/(tm^3)
+		b = (v2 - v0 - atm^2)/tm
+	 */
+	tm := float64(t2 - t0) / 1000.0
+
+	a := (0.5*(v2-v0)*tm + v0*tm - s) *6/(tm*tm*tm)
+	b := (v2 - v0 - a*tm*tm) / tm
+
+	plan := make(map[types.Millisecond]types.MetersPerSecond)
+
+	for ts, t := t0, 0.0; ts < t2; ts += constants.SimulationStepInterval {
+		plan[ts] = a*t*t + b*t + v0
+		if plan[ts] < 0 {
+			return nil, false
+		}
+		t += constants.SimulationStepIntervalSeconds
+	}
+
+	true_s := 0.0
+	for ts := t0; ts < t2; ts += constants.SimulationStepInterval {
+		true_s += plan[ts] * constants.SimulationStepIntervalSeconds
+		if ts != t0 {
+			before := plan[ts - constants.SimulationStepInterval]
+			after := plan[ts]
+			if after > before {
+				// we are accelerating
+				if before + velocityDiffStepAccelerating(before) < after {
+					// impossible acceleration
+					//return nil, false
+				}
+			} else {
+				// we are decelarating
+				if before - velocityDiffStepBraking(before) > after {
+					// impossible deceleration
+					//return nil, false
+				}
+			}
+		}
+	}
+
+	if math.Abs(true_s - s) > 0.1 {
+		panic("Oops")
+	}
+
+	return plan, true
+}
+
+/**
+Nieużywalne ze względu na złożoność (pojedyncze wywołanie to około sekunda)
+ */
+func calculateApproachConflictZonePlan_fixme(t0 types.Millisecond, v0 types.MetersPerSecond, t2 types.Millisecond, v2 types.MetersPerSecond, s types.Meter) (map[types.Millisecond]types.MetersPerSecond, bool) {
+	const maxError = 0.1
+	tm := t2 - t0
+	acc := (v2 - v0) * 1000 / float64(tm)
+	plan := make(map[types.Millisecond]types.MetersPerSecond)
+
+	for v, ts := v0, t0; ts < t2; ts += constants.SimulationStepInterval {
+		plan[ts] = v
+		v += acc * constants.SimulationStepIntervalSeconds
+	}
+	createFunctionAdjustSpeed := func (next bool) func(val float64, n types.Millisecond, commit bool) bool {
+		index := func(n types.Millisecond) types.Millisecond {
+			if next {
+				return n + 10
+			} else {
+				return n - 10
+			}
+		}
+		checkOutOfScope := func(n types.Millisecond) bool {
+			if next {
+				return index(n) >= t2
+			} else {
+				return n-10 <= t0
+			}
+		}
+		edgeCase := func(n types.Millisecond) bool {
+			if next {
+				return n+10 >= t2-10
+			} else {
+				return n-10 <= t0+10
+			}
+		}
+
+		var resultFunction func(val float64, n types.Millisecond, commit bool) bool
+		resultFunction = func(adjustingVal float64, n types.Millisecond, commit bool) bool {
+			if checkOutOfScope(n) {
+				return false
+			}
+			val, e  := plan[index(n)]
+			if e == false {
+				panic("Oops")
+			}
+			if edgeCase(n) {
+				if val > adjustingVal {
+					return adjustingVal + velocityDiffStepAccelerating(adjustingVal) >= val
+				} else {
+					return adjustingVal - velocityDiffStepBraking(adjustingVal) <= val
+				}
+			}
+
+			canAccelerateFromTo := func(from, to types.MetersPerSecond) bool {
+				return from + velocityDiffStepAccelerating(from) >= to
+			}
+
+			canDecelerateFromTo := func(from, to types.MetersPerSecond) bool {
+				return from - velocityDiffStepBraking(from) <= to
+			}
+
+			assert := func(cond bool) {
+				if cond == false {
+					panic("Oops")
+				}
+			}
+
+			var valChanged = val
+
+			const watchDog = 10e4
+			const stepAdjustingVelocity = 0.0001
+			if next {
+				valPrev := adjustingVal
+				if valPrev < val {
+					// przyspieszamy z valPrev -> val
+					if canAccelerateFromTo(valPrev, val) {
+						return true
+					}
+					// nie potrafimy przyspieszyć, trzeba zmienić wartość val (musi być mniejsza)
+					for guard := watchDog; !canAccelerateFromTo(valPrev, valChanged); guard-- {
+						valChanged -= stepAdjustingVelocity
+						if guard == 0 { panic("Oops")}
+					}
+					assert(valChanged != val)
+				} else {
+					// hamujemy z valPrev na val
+					if canDecelerateFromTo(valPrev, val) {
+						return true
+					}
+					// nie potrafimy zahamować, trzeba zmienić wartość val (musi być większa)
+					for guard := watchDog; !canDecelerateFromTo(valPrev, valChanged); guard-- {
+						valChanged += stepAdjustingVelocity
+						if guard == 0 { panic("Oops")}
+					}
+					assert(valChanged != val)
+				}
+			} else {
+				valNext := adjustingVal
+				if val < valNext {
+					// przyspieszamy z val na valNext
+					if canAccelerateFromTo(val, valNext) {
+						return true
+					}
+					// nie potrafimy przyspieszyć, trzeba zmienić wartość val (musi być wieksza)
+					for guard := watchDog; !canAccelerateFromTo(valChanged, valNext); guard-- {
+						valChanged += stepAdjustingVelocity
+						if guard == 0 {
+							panic("Oops")
+						}
+					}
+					assert(valChanged != val)
+				} else {
+					// hamujemy z val na valNext
+					if canDecelerateFromTo(val, valNext) {
+						return true
+					}
+					// nie potrafimy zahamować, trzeba zmienić wartość val (musi być mniejsza)
+					for guard := watchDog; !canDecelerateFromTo(valChanged, valNext); guard-- {
+						valChanged -= stepAdjustingVelocity
+						if guard == 0 { panic("Oops")}
+					}
+					assert(valChanged != val)
+				}
+			}
+
+			success := resultFunction(valChanged, index(n), commit)
+			if commit {
+				if success {
+					plan[index(n)] = valChanged
+					return true
+				} else {
+					panic("Oops")
+				}
+			} else {
+				return success
+			}
+		}
+
+		return resultFunction
+	}
+
+
+
+	adjustSpeedNextStep := createFunctionAdjustSpeed(true)
+	adjustSpeedPrevStep := createFunctionAdjustSpeed(false)
+	correctStep := func (n types.Millisecond, err float64) bool {
+		val := plan[n]
+		//if e == false {
+		//	panic("Oops")
+		//}
+		if err > 0 {
+			val += velocityDiffStepAccelerating(val)
+		} else {
+			val -= velocityDiffStepBraking(val)
+		}
+
+		res1 := adjustSpeedNextStep(val, n, false)
+		res2 := adjustSpeedPrevStep(val, n, false)
+
+		if res1 && res2 {
+			adjustSpeedNextStep(val, n, true)
+			adjustSpeedPrevStep(val, n, true)
+			plan[n] = val
+			return true
+		}
+
+		return false
+	}
+
+	prevErr := 0.0
+	for try := 0; try < 10e3; try += 1 {
+		s0 := 0.0
+		for ts := t0; ts <= t2; ts += constants.SimulationStepInterval {
+			s0 += plan[ts] * constants.SimulationStepIntervalSeconds
+		}
+		if math.Abs(s - s0) < maxError {
+			return plan, true
+		}
+
+		if prevErr != s - s0 {
+			n := types.Millisecond(rand.Intn(int(t2 - t0))) + t0
+			n = n - n % 10
+			correctStep(n, s - s0)
+		} else {
+			success := false
+			for t := t0; t < t2; t += constants.SimulationStepInterval {
+				if correctStep(t, s - s0) {
+					success = true
+					break
+				}
+			}
+			if success == false {
+				return nil, false
+			}
+		}
+		prevErr = s - s0
+	}
+
+	return nil, false
+}
+
 
 func calculateDistSpeedAfter(plan map[types.Millisecond]types.MetersPerSecond, ts types.Millisecond, timeDuration types.Millisecond) (types.MetersPerSecond, types.Meter) {
 	s := 0.0
@@ -692,7 +950,6 @@ func calculateApproachConflictZoneTimeSpeed(v0, s, v2 float64) (types.Millisecon
 
 			if sTotal < s && s < sTotal + currV * constants.SimulationStepIntervalSeconds &&
 				sTotal + currV * constants.SimulationStepIntervalSeconds - s > maxError {
-
 					return tryTargetVRange(v_a, targetV)
 			}
 		}

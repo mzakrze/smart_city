@@ -25,6 +25,8 @@ func IntersectionManagerSingleton(graph *util.Graph, networkCard *CommunicationL
 			policy = CreateIntersectionPolicySequential(graph)
 		case "fcfs":
 			policy = CreateIntersectionPolicyFcfs(graph, configuration)
+		case "trafficLights":
+			policy = CreateIntersectionPolicyTrafficLights(graph, configuration)
 		default:
 			panic("Illegal name of intersection policy")
 		}

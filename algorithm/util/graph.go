@@ -38,7 +38,7 @@ type Node struct {
 	IsExitPoint bool
 	EntryPointId int
 	ExitPointId	int
-	WayId int
+	WayId types.WayId
 }
 
 type Edge struct {
@@ -141,7 +141,7 @@ func ReadGraph(host string) (*Graph, error) {
 			IsExitPoint: n.IsExitPoint,
 			EntryPointId: n.EntryPointId,
 			ExitPointId: n.ExitPointId,
-			WayId: n.WayId,
+			WayId: types.WayId(n.WayId),
 			EdgesFrom: []*Edge{},
 		}
 

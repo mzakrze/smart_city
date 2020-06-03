@@ -21,18 +21,29 @@ type Configuration struct {
 
 func ReadConfiguration(filePath string) (Configuration, error) {
 	// TODO read from file
-	return Configuration{
+	c := Configuration{
 		VehiclesPerMinute: 120,
-		IntersectionPolicy: "fcfs",
-		SimulationDuration: 30,
+		IntersectionPolicy: "trafficLights",
+		SimulationDuration: 60,
 		VehicleMaxSpeed: 10,
 		RandomSeed: 42,
-		VehiclePower: 100,
+		VehiclePower: 80,
 		VehicleBrakingForce: 4000.0,
 		VehicleWeight: 1500.0,
 		VehicleMaxAngularSpeed: 0.4,
 		VehicleMaxSpeedOnConflictZone: 15.0,
 		DsrcMsgLossProbability: 0.0,
 		DsrcMsgAvgDelay: 0,
-	}, nil
+	}
+
+	if c.DsrcMsgAvgDelay != 0 {
+		panic("Illegal DsrcMsgAvgDelay for traffic lights (must be 0)")
+	}
+	if c.DsrcMsgLossProbability != 0 {
+		panic("Illegal DsrcMsgLossProbability for traffic lights (must be 0)")
+	}
+
+
+	return c, nil
+
 }
