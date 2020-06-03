@@ -57,7 +57,7 @@ type DsrcV2VMessage struct {
 	y                        types.YCoord
 }
 
-func CommunicationLayerSingleton(proxy *AllVehicleProxy) *CommunicationLayer {
+func CommunicationLayerSingleton(proxy *AllVehicleProxy, configuration util.Configuration) *CommunicationLayer {
 	if instanceCommunication == nil {
 		instanceCommunication = &CommunicationLayer{
 			proxy: proxy,

@@ -18,10 +18,12 @@ type SimulationRunner struct {
 	allVehiclesProxy *vehicle.AllVehicleProxy
 	communicationLayer *vehicle.CommunicationLayer
 	sensorLayer *vehicle.SensorLayer
-	resultsLogger *logging.ResultsLogger
+	resultsLogger logging.IResultsLogger
 	collisionDetector *vehicle.CollisionDetector
 
 	nextVehicleId types.VehicleId
+	vehicleIdToAppearTs map[types.VehicleId]types.Millisecond
+	vehicleIdToLeaveTs map[types.VehicleId]types.Millisecond
 	CurrentTs types.Millisecond
 }
 
@@ -34,7 +36,7 @@ func SimulationRunnerSingleton(
 		allVehiclesProxy *vehicle.AllVehicleProxy,
 		communicationLayer *vehicle.CommunicationLayer,
 		sensorLayer *vehicle.SensorLayer,
-		resultsLogger *logging.ResultsLogger,
+		resultsLogger logging.IResultsLogger,
 		collisionDetector *vehicle.CollisionDetector,
 	) *SimulationRunner {
 
@@ -48,14 +50,21 @@ func SimulationRunnerSingleton(
 			sensorLayer: sensorLayer,
 			resultsLogger: resultsLogger,
 			collisionDetector: collisionDetector,
+			vehicleIdToLeaveTs: make(map[types.VehicleId]types.Millisecond),
+			vehicleIdToAppearTs: make(map[types.VehicleId]types.Millisecond),
+			nextVehicleId: 1,
 		}
 	}
 
 	return instance
 }
 
+type ShortStats struct {
+	Throughput int // vehicles per minute
+	AverageDelay int // seconds (rounded)
+}
 
-func (r *SimulationRunner) RunSimulation() {
+func (r *SimulationRunner) RunSimulation() ShortStats {
 
 	ts := types.Millisecond(0)
 
@@ -66,11 +75,10 @@ func (r *SimulationRunner) RunSimulation() {
 		return (ts + constants.SimulationStepInterval) % 1000 == 0
 	}
 	simulationDurationElapsed := func() bool {
-		return ts >= types.Millisecond(r.configuration.SimulationDuration.Seconds() * 1000)
+		return ts >= types.Millisecond((constants.WarmupSeconds + r.configuration.SimulationDuration) * 1000)
 	}
 	simulationFinished := func() bool {
-		return simulationDurationElapsed() &&
-			isFullSecond()
+		return simulationDurationElapsed() && isFullSecond()
 	}
 
 	r.resultsLogger.SimulationStarted(time.Now())
@@ -91,7 +99,7 @@ func (r *SimulationRunner) RunSimulation() {
 
 		// Premise: vehicle must disappear only on full second - step interval
 		if isFullSecondMinusStep() {
-			prunedVehicles := r.cleanUpVehicles()
+			prunedVehicles := r.cleanUpVehicles(ts)
 			for _, v := range prunedVehicles {
 				r.resultsLogger.VehicleFinished(v.Id, ts)
 			}
@@ -104,7 +112,10 @@ func (r *SimulationRunner) RunSimulation() {
 
 	r.resultsLogger.SimulationFinished(time.Now())
 
+	return r.getStatitistics()
 }
+
+
 
 func (r *SimulationRunner) spawnNewVehicles(ts types.Millisecond) []*vehicle.VehicleActor {
 	spawned := []*vehicle.VehicleActor{}
@@ -120,6 +131,7 @@ func (r *SimulationRunner) spawnNewVehicles(ts types.Millisecond) []*vehicle.Veh
 			break
 		}
 
+		r.vehicleIdToAppearTs[newVehicle.Id] = ts
 		r.allVehiclesProxy.RegisterVehicle(newVehicle)
 		spawned = append(spawned, newVehicle)
 	}
@@ -174,7 +186,7 @@ func (r *SimulationRunner) createRandomVehicleIfEntryPointAvailable(ts types.Mil
 		return nil // no available entrypoint - cannot generate new vehicle
 	}
 	// given a (deceleration) and s (braking distance), what is max v (speed)?
-	initSpeed := math.Min(r.configuration.VehicleMaxSpeed, math.Sqrt(2 * distance * constants.VehicleBrakingForce / constants.Vehicleweight) * 0.5) * 0.8
+	initSpeed := math.Min(r.configuration.VehicleMaxSpeed, math.Sqrt(2 * distance * r.configuration.VehicleBrakingForce / r.configuration.VehicleWeight) * 0.5) * 0.8
 
 	exitpoint := getRandomCompatibleExitpoint(entrypoint)
 
@@ -185,7 +197,7 @@ func (r *SimulationRunner) createRandomVehicleIfEntryPointAvailable(ts types.Mil
 }
 
 
-func (r *SimulationRunner) cleanUpVehicles() []*vehicle.VehicleActor {
+func (r *SimulationRunner) cleanUpVehicles(ts types.Millisecond) []*vehicle.VehicleActor {
 	pruned := []*vehicle.VehicleActor{}
 
 	allVehicles := r.allVehiclesProxy.GetAllVehicles()
@@ -197,8 +209,32 @@ func (r *SimulationRunner) cleanUpVehicles() []*vehicle.VehicleActor {
 		}
 	}
 	for _, v := range pruned {
+		r.vehicleIdToLeaveTs[v.Id] = ts
 		r.allVehiclesProxy.UnregisterVehicle(v)
 	}
 
 	return pruned
+}
+
+func (r *SimulationRunner) getStatitistics() ShortStats {
+	timeToIgnore := types.Millisecond(constants.WarmupSeconds * 1000)
+
+	vehiclesCounter := 0
+	sumDelay := types.Millisecond(0)
+
+	for vId, tsAppear := range r.vehicleIdToAppearTs {
+		if tsAppear >= timeToIgnore {
+			tsLeft, e := r.vehicleIdToLeaveTs[vId]
+			if e {
+				sumDelay += tsLeft - tsAppear
+				vehiclesCounter += 1
+			}
+		}
+	}
+
+	return ShortStats{
+		Throughput: vehiclesCounter * 60 / r.configuration.SimulationDuration,
+		AverageDelay: int(float64(sumDelay) / float64(vehiclesCounter) / 1000),
+	}
+
 }

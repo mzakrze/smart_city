@@ -8,14 +8,6 @@ import (
 	"math"
 )
 
-type vehicleState = int
-const (
-	beforeIntersectionNotAllowed = 1 + iota
-	beforeIntersectionHasReservation
-	atIntersection
-	afterIntersection
-)
-
 type VehicleActor struct {
 	Id          types.VehicleId
 	X           types.XCoord
@@ -43,7 +35,7 @@ type VehicleActor struct {
 }
 
 
-func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitpoint *util.Node, initSpeed types.MetersPerSecond, roadGraph *util.Graph, sensor *SensorLayer, comm *CommunicationLayer) *VehicleActor {
+func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitpoint *util.Node, initSpeed types.MetersPerSecond, roadGraph *util.Graph, sensor *SensorLayer, nc *CommunicationLayer) *VehicleActor {
 	v := VehicleActor{
 		Id:             id,
 		X:              entrypoint.X,
@@ -59,7 +51,7 @@ func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitp
 		roadGraph:      roadGraph,
 		sensor:         sensor,
 		State:          beforeIntersectionNotAllowed,
-		networkCard:    comm,
+		networkCard:    nc,
 	}
 
 	v.planRoute()
@@ -68,22 +60,6 @@ func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitp
 
 	return &v
 }
-
-type reservation struct {
-	reservationId		types.ReservationId
-	arriveConflictZoneTs types.Millisecond
-	arriveConflictZoneSpeed types.MetersPerSecond
-	leaveConflictZoneTs types.Millisecond
-	speedPerTime map[types.Millisecond]types.MetersPerSecond
-}
-
-type platooningReservation struct {
-	reservationId            types.ReservationId
-	arriveConflictZoneTs     types.Millisecond
-	arriveConflictZoneSpeed  types.MetersPerSecond
-	approachConflictZonePlan map[types.Millisecond]types.MetersPerSecond
-}
-
 
 func (v *VehicleActor) Ping(ts types.Millisecond) {
 
@@ -121,6 +97,44 @@ func (v *VehicleActor) Ping(ts types.Millisecond) {
 			v.State = afterIntersection
 		}
 	}
+}
+
+func Initiate(conf util.Configuration) {
+	vehiclePower = 745.699872 * conf.VehiclePower
+	vehicleBrakingForce = conf.VehicleBrakingForce
+	vehicleweight = conf.VehicleWeight
+	vehicleMaxAngularSpeed = conf.VehicleMaxAngularSpeed
+	vehicleMaxSpeedOnConflictZone = conf.VehicleMaxSpeedOnConflictZone
+}
+
+var vehiclePower = 120.0 * 745.699872 		// horse power
+var vehicleBrakingForce = 3000.0      		// N
+var vehicleweight = 1200.0            		// kilogram
+var vehicleMaxAngularSpeed = 0.4			// radians/s
+var vehicleMaxSpeedOnConflictZone = 15.0	// m/s
+
+type vehicleState = int
+const (
+	beforeIntersectionNotAllowed vehicleState = 1 + iota
+	beforeIntersectionHasReservation
+	atIntersection
+	afterIntersection
+)
+
+
+type reservation struct {
+	reservationId		types.ReservationId
+	arriveConflictZoneTs types.Millisecond
+	arriveConflictZoneSpeed types.MetersPerSecond
+	leaveConflictZoneTs types.Millisecond
+	speedPerTime map[types.Millisecond]types.MetersPerSecond
+}
+
+type platooningReservation struct {
+	reservationId            types.ReservationId
+	arriveConflictZoneTs     types.Millisecond
+	arriveConflictZoneSpeed  types.MetersPerSecond
+	approachConflictZonePlan map[types.Millisecond]types.MetersPerSecond
 }
 
 
@@ -262,7 +276,7 @@ func (vehicle *VehicleActor) sendRequestReservation(ts types.Millisecond) {
 		hipotheticalPlan[t] = vehicle.approachConflictZoneNoReservationPlan[t]
 	}
 
-	vMax := constants.VehicleMaxSpeedOnConflictZone
+	vMax := vehicleMaxSpeedOnConflictZone
 	if vehicle.isTurning() {
 		vMax = vehicle.calculateMaxSpeedOnCurve()
 	}
@@ -272,7 +286,7 @@ func (vehicle *VehicleActor) sendRequestReservation(ts types.Millisecond) {
 	t = t - t % 10
 	if ok == false {
 		if vehicle.Speed == 0 {
-			fmt.Println("Vehicle with speed 0 cannot approach conflict zone time speed")
+			fmt.Println("Vehicle with speed 0 cannot approach conflict zone. v0, s, vMax = ", v0, s, vMax)
 		}
 		return
 		//panic("Oops")
@@ -492,7 +506,7 @@ func (v *VehicleActor) calculateMaxSpeedOnCurve() types.MetersPerSecond {
 		x1 := r[1].X
 		x2 := r[len(r) - 1].X
 		radius := math.Abs(x1 - x2)
-		maxSpeedOnCurve := 2.0 * constants.VehicleMaxAngularSpeed * radius
+		maxSpeedOnCurve := 2.0 * vehicleMaxAngularSpeed * radius
 		if radius == 0.0 {
 			fmt.Println("Oops")
 		}
@@ -531,8 +545,8 @@ func (vehicle *VehicleActor) planApproachConflictZoneNoReservation(ts types.Mill
 	d := math.Min(d1, d2)
 
 	brakingDist := func() float64 {
-		w := 0.5 * constants.Vehicleweight * v * v
-		s := w / constants.VehicleBrakingForce
+		w := 0.5 * vehicleweight * v * v
+		s := w / vehicleBrakingForce
 		return s
 	}
 
@@ -638,11 +652,11 @@ func calculateApproachConflictZoneTimeSpeed(v0, s, v2 float64) (types.Millisecon
 
 func velocityDiffStepBraking(v float64) float64 {
 	s := v * constants.SimulationStepIntervalSeconds
-	w_diff := constants.VehicleBrakingForce * s
-	if v * v - 2.0 * w_diff / constants.Vehicleweight < 0 {
+	w_diff := vehicleBrakingForce * s
+	if v * v - 2.0 * w_diff /vehicleweight < 0 {
 		return v
 	}
-	v2 := math.Sqrt(v * v - 2.0 * w_diff / constants.Vehicleweight)
+	v2 := math.Sqrt(v * v - 2.0 * w_diff /vehicleweight)
 	if v2 >= v && v != 0 {
 		panic("Oops")
 	}
@@ -650,8 +664,8 @@ func velocityDiffStepBraking(v float64) float64 {
 }
 
 func velocityDiffStepAccelerating(v float64) float64 {
-	w_diff := constants.VehiclePower * constants.SimulationStepIntervalSeconds
-	v2 := math.Sqrt(v * v + 2.0 * w_diff / constants.Vehicleweight)
+	w_diff := vehiclePower * constants.SimulationStepIntervalSeconds
+	v2 := math.Sqrt(v * v + 2.0 * w_diff /vehicleweight)
 	if v >= v2 {
 		panic("Oops")
 	}

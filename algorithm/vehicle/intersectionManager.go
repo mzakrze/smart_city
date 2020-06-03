@@ -20,7 +20,6 @@ type IntersectionManager struct {
 func IntersectionManagerSingleton(graph *util.Graph, networkCard *CommunicationLayer, configuration util.Configuration) (*IntersectionManager, error) {
 	if instance == nil {
 		var policy IntersectionPolicy
-		// TODO - use reflection to create instance (add method to IntersectionPolicy returing code)
 		switch configuration.IntersectionPolicy {
 		case "sequential":
 			policy = CreateIntersectionPolicySequential(graph)

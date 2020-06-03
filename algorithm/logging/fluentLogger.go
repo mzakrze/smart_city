@@ -23,11 +23,39 @@ Let's take an arbitrary coordinates to work with (maxLat and maxLon arise from m
 const minLat = 52.219111
 const minLon = 21.011711
 
-type IResultLogger interface {
+type IResultsLogger interface {
+	SimulationStarted(time.Time)
+	SimulationFinished(time.Time)
+	VehicleStepReport(types.VehicleId, types.Millisecond, types.XCoord, types.YCoord, types.Angle, types.MetersPerSecond, types.MetersPerSecond2, int)
+	VehicleFinished(id types.VehicleId, ts types.Millisecond)
+}
+
+type iResultsLoggerWrapper struct {
+	wrapper *resultsLogger
+}
+
+func (logger iResultsLoggerWrapper) SimulationStarted(startTime time.Time) {
+	logger.wrapper.SimulationStarted(startTime)
+}
+
+func (logger iResultsLoggerWrapper) SimulationFinished(finishTime time.Time) {
+	logger.wrapper.SimulationFinished(finishTime)
+}
+
+func (logger iResultsLoggerWrapper) VehicleStepReport(vId types.VehicleId, ts types.Millisecond, x types.XCoord, y types.YCoord, alpha types.Angle, speed types.MetersPerSecond, acc types.MetersPerSecond2, state int) {
+	logger.wrapper.VehicleStepReport(vId, ts, x, y, alpha, speed, acc, state)
+}
+
+func (logger iResultsLoggerWrapper) VehicleFinished(id types.VehicleId, ts types.Millisecond) {
+	logger.wrapper.VehicleFinished(id, ts)
+}
+
+
+type iResultLogger interface {
 	Post(tag string, msg interface{}) error
 }
 
-func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Meter, simulationDurationSeconds float64) *ResultsLogger {
+func ResultsLoggerSingleton(logger iResultLogger, mapWidth, mapHeight types.Meter, simulationDurationSeconds int) IResultsLogger {
 	const simulationStep = types.Millisecond(10)
 
 	// Let's assume that simulation area is small enough to calculate as if Earth is flat
@@ -40,7 +68,7 @@ func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Mete
 	}
 
 	if instance == nil {
-		instance = &ResultsLogger{
+		instance = &resultsLogger{
 			logger: logger,
 			simulationStepInterval: simulationStep,
 			yToLat: yToLat,
@@ -58,19 +86,19 @@ func ResultsLoggerSingleton(logger IResultLogger, mapWidth, mapHeight types.Mete
 			simulationDurationSeconds: simulationDurationSeconds,
 		}
 	}
-	return instance
+	return iResultsLoggerWrapper{wrapper: instance}
 }
 
-func (f *ResultsLogger) SimulationStarted(startTime time.Time) {
+func (f *resultsLogger) SimulationStarted(startTime time.Time) {
 	f.simulationStartTime = startTime
 }
-func (f *ResultsLogger) SimulationFinished(finishTime time.Time) {
+func (f *resultsLogger) SimulationFinished(finishTime time.Time) {
 	f.simulationFinishTime = finishTime
 	f.sendInfoLog()
 	f.sendIntersectionLog()
 }
 
-func (f *ResultsLogger) VehicleStepReport(id types.VehicleId, ts types.Millisecond, x types.XCoord, y types.YCoord, alpha types.Angle, speed types.MetersPerSecond, acc types.MetersPerSecond2, state int) {
+func (f *resultsLogger) VehicleStepReport(id types.VehicleId, ts types.Millisecond, x types.XCoord, y types.YCoord, alpha types.Angle, speed types.MetersPerSecond, acc types.MetersPerSecond2, state int) {
 	f.maxTs = int(math.Max(float64(ts), float64(f.maxTs)))
 
 	if ts % 100 == 0 {
@@ -93,7 +121,7 @@ func (f *ResultsLogger) VehicleStepReport(id types.VehicleId, ts types.Milliseco
 	}
 }
 
-func (f *ResultsLogger) VehicleFinished(id types.VehicleId, ts types.Millisecond) {
+func (f *resultsLogger) VehicleFinished(id types.VehicleId, ts types.Millisecond) {
 	if ts % 1000 != 990 {
 		panic("Premise broken :( Vehicle should finish only on full second minus step interval")
 	}
@@ -105,9 +133,9 @@ func (f *ResultsLogger) VehicleFinished(id types.VehicleId, ts types.Millisecond
 }
 
 
-var instance *ResultsLogger = nil
-type ResultsLogger struct {
-	logger IResultLogger
+var instance *resultsLogger = nil
+type resultsLogger struct {
+	logger iResultLogger
 
 	simulationStartTime  time.Time
 	simulationFinishTime time.Time
@@ -131,7 +159,7 @@ type ResultsLogger struct {
 
 	intersectionLogVehiclesArrive map[types.Second]int
 	intersectionLogVehiclesLeave  map[types.Second]int
-	simulationDurationSeconds            float64
+	simulationDurationSeconds            int
 	vehiclesFinishedThroughput			int
 }
 
@@ -161,7 +189,7 @@ func calculateMaxLatMaxLon(x types.Meter, y types.Meter) (float64, float64) {
 
 
 
-func (f *ResultsLogger) appendToMapLog(step int, id types.VehicleId, x types.XCoord, y types.YCoord, alpha types.Angle, state int) {
+func (f *resultsLogger) appendToMapLog(step int, id types.VehicleId, x types.XCoord, y types.YCoord, alpha types.Angle, state int) {
 	if _, exists := f.mapLogLocation[id]; exists == false {
 		if step != 0 { panic("Illegal bucket state") }
 		f.mapLogLocation[id] = make([]types.LocationStruct, f.bucketSize)
@@ -172,7 +200,7 @@ func (f *ResultsLogger) appendToMapLog(step int, id types.VehicleId, x types.XCo
 	f.mapLogAlpha[id][step] = alpha
 	f.mapLogState[id][step] = state
 }
-func (f *ResultsLogger) appendToVehicleLog(step int, id types.VehicleId, speed types.MetersPerSecond, acc types.MetersPerSecond2) {
+func (f *resultsLogger) appendToVehicleLog(step int, id types.VehicleId, speed types.MetersPerSecond, acc types.MetersPerSecond2) {
 	if _, exists := f.vehicleLogSpeed[id]; exists == false {
 		if step != 0 { panic("Illegal bucket state") }
 		f.vehicleLogSpeed[id] = make([]types.MetersPerSecond, f.bucketSize)
@@ -182,8 +210,8 @@ func (f *ResultsLogger) appendToVehicleLog(step int, id types.VehicleId, speed t
 	f.vehicleLogAcc[id][step] = acc
 }
 
-func (f *ResultsLogger) sendInfoLog() {
-	throughput := int(float64(f.vehiclesFinishedThroughput) * 60 / f.simulationDurationSeconds) // per minute - hence "* 60"
+func (f *resultsLogger) sendInfoLog() {
+	throughput := int(float64(f.vehiclesFinishedThroughput) * 60 / float64(f.simulationDurationSeconds)) // per minute - hence "* 60"
 	msg := map[string]string {
 		"simulation_name": constants.SimulationName,
 		"simulation_started_ts": fmt.Sprintf("%d", f.simulationStartTime.Second()),
@@ -195,7 +223,7 @@ func (f *ResultsLogger) sendInfoLog() {
 	err := f.logger.Post(infoTag, msg); if err != nil { panic(err) }
 }
 
-func (f *ResultsLogger) sendMapLogAndFlush(vId types.VehicleId) {
+func (f *resultsLogger) sendMapLogAndFlush(vId types.VehicleId) {
 	alpha := f.mapLogAlpha[vId]
 	location := f.mapLogLocation[vId]
 	state := f.mapLogState[vId]
@@ -226,7 +254,7 @@ func (f *ResultsLogger) sendMapLogAndFlush(vId types.VehicleId) {
 	}
 }
 
-func (f *ResultsLogger) sendIntersectionLog() {
+func (f *resultsLogger) sendIntersectionLog() {
 	for sec := types.Second(0); sec <= f.currentSecond; sec++ {
 		msg := map[string]string {
 			"simulation_name": constants.SimulationName,
@@ -242,7 +270,7 @@ func (f *ResultsLogger) sendIntersectionLog() {
 	}
 }
 
-func (f *ResultsLogger) sendVehicleLogAndFlush(id types.VehicleId, leaveTs types.Millisecond) {
+func (f *resultsLogger) sendVehicleLogAndFlush(id types.VehicleId, leaveTs types.Millisecond) {
 	acc := f.vehicleLogAcc[id]
 	speed := f.vehicleLogSpeed[id]
 	arriveTs := f.vehicleLogArrive[id]
@@ -271,7 +299,7 @@ func (f *ResultsLogger) sendVehicleLogAndFlush(id types.VehicleId, leaveTs types
 	delete(f.vehicleLogArrive, id)
 }
 
-func (f *ResultsLogger) sendVehicleStepReport(id types.VehicleId, ts types.Millisecond, xCoord types.XCoord, yCoord types.YCoord, speed types.MetersPerSecond, acc types.MetersPerSecond2) {
+func (f *resultsLogger) sendVehicleStepReport(id types.VehicleId, ts types.Millisecond, xCoord types.XCoord, yCoord types.YCoord, speed types.MetersPerSecond, acc types.MetersPerSecond2) {
 	// FIXME - nie jest otestowane
 	msg := map[string]string {
 		"simulation_name": constants.SimulationName,

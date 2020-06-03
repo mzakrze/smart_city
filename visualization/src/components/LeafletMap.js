@@ -196,9 +196,9 @@ class LeafletMap extends React.Component{
         this.simulationVisualizationLayer
             .addTo(this.map);
 
-        // this.graphPlotLayer = new GraphPlotLayer();
-        // this.graphPlotLayer
-        //     .addTo(this.map);
+        this.graphPlotLayer = new GraphPlotLayer();
+        this.graphPlotLayer
+            .addTo(this.map);
 
         var scale = L.control.scale({
             metric: true,

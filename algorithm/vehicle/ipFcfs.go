@@ -184,7 +184,7 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 	if msg.IsTurning {
 		vMax = msg.MaxSpeedOnCurve
 	} else {
-		vMax = constants.VehicleMaxSpeedOnConflictZone
+		vMax = vehicleMaxSpeedOnConflictZone
 	}
 
 	var reservationTsToSpeed map[types.Millisecond]types.MetersPerSecond

@@ -23,4 +23,4 @@ WORKDIR /root/
 
 COPY --from=0 /go/src/algorithm/app .
 
-CMD ["./app", "--docker", "true"]
+CMD ["./app", "--docker", "--visual"]

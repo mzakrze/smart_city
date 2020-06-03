@@ -247,7 +247,7 @@ func (ip *IntersectionPolicySequential) calculateRouteForRequest(req DsrcV2RMess
 		if req.IsTurning {
 			accelerateTo(req.MaxSpeedOnCurve)
 		} else {
-			accelerateTo(constants.VehicleMaxSpeedOnConflictZone)
+			accelerateTo(vehicleMaxSpeedOnConflictZone)
 		}
 	}
 
