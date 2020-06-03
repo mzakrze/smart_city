@@ -291,9 +291,9 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 		reservationTsToSpeed[ts] = speed
 
 		for i := range grids {
-			asdf := ip.reservationTable[ip.tableIndex + ts/10]
-			state := asdf[grids[i].x][grids[i].y]
-			if state == taken {
+			x, y := grids[i].x, grids[i].y
+			frame := ip.reservationTable[ip.tableIndex/10 + ts/10]
+			if frame[x][y] == taken {
 				fitsInReservationTable = false
 				break outer_for_label
 			}
@@ -312,12 +312,12 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 	// vehicle fits in the reservation table - so let's actually reserve it
 	ts = reservationFromTs
 
-	for j := range reservedGrids {
-		for i := range reservedGrids[j] {
-			x := reservedGrids[j][i].x
-			y := reservedGrids[j][i].y
+	for i := range reservedGrids {
+		for j := range reservedGrids[i] {
+			x := reservedGrids[i][j].x
+			y := reservedGrids[i][j].y
 
-			ip.reservationTable[ip.tableIndex + ts/10][x][y] = taken
+			ip.reservationTable[ip.tableIndex/10 + ts/10][x][y] = taken
 		}
 		ts += constants.SimulationStepInterval
 	}
@@ -328,7 +328,6 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 		endTs: ts,
 		reservedGrids: reservedGrids,
 	}
-	ip.nextReservationId += 1
 
 	reply := DsrcR2VMessage{
 		reservationId: ip.nextReservationId,
@@ -344,32 +343,35 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 	ip.reservations[reservation.reservationId] = reservation
 	ip.replies = append(ip.replies, reply)
 
-
-
 	return true
 }
 
 func (ip *IntersectionPolicyFcfs) cancelReservation(reservationId types.ReservationId) {
-	fmt.Println("cancelling")
-	reservation := ip.reservations[reservationId]
+	fmt.Println("cancelling reservation id:", reservationId)
+	reservation, e := ip.reservations[reservationId]
+	if e == false {
+		panic("Oops - cancelling not existing reservation")
+	}
 
+	counter := 0
 	for t := range reservation.reservedGrids {
 
 		for i := range reservation.reservedGrids[t] {
 			x := reservation.reservedGrids[t][i].x
-			y := reservation.reservedGrids[t][i].x
+			y := reservation.reservedGrids[t][i].y
 
-			v := ip.reservationTable[ip.tableIndex + reservation.startTs + types.Millisecond(t)][x][y]
+			index := ip.tableIndex/10 + reservation.startTs/10 + types.Millisecond(t)
+			v := ip.reservationTable[index][x][y]
 			if v != taken {
 				panic("Oops")
 			}
 
-			ip.reservationTable[ip.tableIndex + reservation.startTs + types.Millisecond(t)][x][y] = free
+			ip.reservationTable[index][x][y] = free
+			counter += 1
 		}
 	}
 
 	delete(ip.reservations, reservationId)
-
 }
 
 //func (ip *IntersectionPolicyFcfs) calcOccupied() int {
