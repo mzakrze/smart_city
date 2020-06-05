@@ -9,4 +9,4 @@ const VehicleWidth = types.Meter(1.981)
 
 const SimulationName = "simulation"
 
-const WarmupSeconds = 5
+const WarmupSeconds = 30

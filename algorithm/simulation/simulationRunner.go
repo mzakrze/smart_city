@@ -126,12 +126,6 @@ func (r *SimulationRunner) spawnNewVehicles(ts types.Millisecond) []*vehicle.Veh
 		toSpawn += 1
 	}
 
-	//if len(r.allVehiclesProxy.GetAllVehicles()) == 0 {
-	//	toSpawn = 1
-	//} else {
-	//	toSpawn = 0
-	//}
-
 	for i := 0; i < toSpawn; i++ {
 		newVehicle := r.createRandomVehicleIfEntryPointAvailable(ts)
 		if newVehicle == nil {
@@ -221,7 +215,7 @@ func (r *SimulationRunner) createRandomVehicleIfEntryPointAvailable(ts types.Mil
 		return nil // no available entrypoint - cannot generate new vehicle
 	}
 	// given a (deceleration) and s (braking distance), what is max v (speed)?
-	initSpeed := math.Min(r.configuration.VehicleMaxSpeed, math.Sqrt(2 * distance * r.configuration.VehicleBrakingForce / r.configuration.VehicleWeight) * 0.5) * 0.8
+	initSpeed := math.Min(10.0, math.Sqrt(2 * distance * r.configuration.VehicleBrakingForce / r.configuration.VehicleWeight) * 0.5) * 0.8
 	exitpoint := getRandomCompatibleExitpoint(entrypoint)
 
 	vId := r.nextVehicleId

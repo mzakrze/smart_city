@@ -53,9 +53,6 @@ def parse_config(path):
     config.duration = int(configParser.get('simulation', 'duration'))
     config.map_type = configParser.get('simulation', 'map.type')
     config.map_lanes = int(configParser.get('simulation', 'map.lanes'))
-    config.vehicle_speed = float(configParser.get('simulation', 'vehicle.max_speed'))
-    config.vehicle_acc = float(configParser.get('simulation', 'vehicle.max_acc'))
-    config.vehicle_decel = float(configParser.get('simulation', 'vehicle.max_decel'))
 
     return config, content
 

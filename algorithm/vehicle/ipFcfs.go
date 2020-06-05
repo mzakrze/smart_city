@@ -4,14 +4,13 @@ import (
 	"algorithm/constants"
 	"algorithm/types"
 	"algorithm/util"
-	"fmt"
 	"math"
 	"runtime"
 )
 
 type GridState int
 const (
-	free GridState = iota // has to be 0 (default value)
+	free GridState = iota + 1
 	taken
 )
 
@@ -55,10 +54,13 @@ func CreateIntersectionPolicyFcfs(graph *util.Graph, configuration util.Configur
 		reservationTable[i] = make([][]GridState, gridNoX)
 		for x := range reservationTable[i] {
 			reservationTable[i][x] = make([]GridState, gridNoY)
+			for y := range reservationTable[i][x] {
+				reservationTable[i][x][y] = free
+			}
 		}
 	}
 
-	return &IntersectionPolicyFcfs{
+	r := &IntersectionPolicyFcfs{
 		replies: []DsrcR2VMessage{},
 		reservationTable: reservationTable,
 		reservations: make(map[types.ReservationId]ipFcfsReservation),
@@ -66,6 +68,12 @@ func CreateIntersectionPolicyFcfs(graph *util.Graph, configuration util.Configur
 		graph: graph,
 		tableIndex: 0,
 	}
+
+	if r.calcOccupied() > 0 {
+		panic("Oops")
+	}
+
+	return r
 }
 
 func (ip * IntersectionPolicyFcfs) ProcessMsg(m DsrcV2RMessage) {
@@ -293,10 +301,14 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 		for i := range grids {
 			x, y := grids[i].x, grids[i].y
 			frame := ip.reservationTable[ip.tableIndex/10 + ts/10]
+			if frame[x][y] == free {
+				continue
+			}
 			if frame[x][y] == taken {
 				fitsInReservationTable = false
 				break outer_for_label
 			}
+			panic("Oops")
 		}
 
 		accelerateVehicle()
@@ -311,12 +323,14 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 
 	// vehicle fits in the reservation table - so let's actually reserve it
 	ts = reservationFromTs
-
 	for i := range reservedGrids {
 		for j := range reservedGrids[i] {
 			x := reservedGrids[i][j].x
 			y := reservedGrids[i][j].y
 
+			if ip.reservationTable[ip.tableIndex/10 + ts/10][x][y] == taken {
+				panic("OOps")
+			}
 			ip.reservationTable[ip.tableIndex/10 + ts/10][x][y] = taken
 		}
 		ts += constants.SimulationStepInterval
@@ -343,14 +357,14 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 	ip.reservations[reservation.reservationId] = reservation
 	ip.replies = append(ip.replies, reply)
 
+
 	return true
 }
 
 func (ip *IntersectionPolicyFcfs) cancelReservation(reservationId types.ReservationId) {
-	fmt.Println("cancelling reservation id:", reservationId)
 	reservation, e := ip.reservations[reservationId]
 	if e == false {
-		panic("Oops - cancelling not existing reservation")
+		panic("Oops")
 	}
 
 	counter := 0
@@ -374,32 +388,40 @@ func (ip *IntersectionPolicyFcfs) cancelReservation(reservationId types.Reservat
 	delete(ip.reservations, reservationId)
 }
 
-//func (ip *IntersectionPolicyFcfs) calcOccupied() int {
-//	calc := 0
-//	for t := range ip.reservationTable {
-//		for x := range ip.reservationTable[ip.reservationTableFrom + t] {
-//			for y := range ip.reservationTable[ip.reservationTableFrom + t][x] {
-//				if ip.reservationTable[ip.reservationTableFrom + t][x][y] == taken {
-//					calc += 1
-//				}
-//			}
-//		}
-//	}
-//	return calc
-//}
+func (ip *IntersectionPolicyFcfs) calcOccupied() int {
+	calc := 0
+	for t := range ip.reservationTable {
+		for x := range ip.reservationTable[t] {
+			for y := range ip.reservationTable[t][x] {
+				if ip.reservationTable[t][x][y] == taken {
+					calc += 1
+				}
+			}
+		}
+	}
+	return calc
+}
 
 func (ip *IntersectionPolicyFcfs) relocateTableIfNecessary(ts types.Millisecond) {
 	const size = 1000
-	if (ts / 10) % size != 0 && ts != 0 {
+	if ts % size != 0 || ts == 0 {
 		return
 	}
 	ip.tableIndex -= size
 
-	for i := size; i < cap(ip.reservationTable); i++ {
-		ip.reservationTable[i - size] = ip.reservationTable[i]
+	for i := size/10; i < len(ip.reservationTable); i++ {
+		for x := range ip.reservationTable[i] {
+			for y := range ip.reservationTable[i][x] {
+
+				ip.reservationTable[i - size/10][x][y] = ip.reservationTable[i][x][y]
+
+			}
+		}
 	}
 
-	for i := cap(ip.reservationTable) - size; i < cap(ip.reservationTable); i++ {
+	framesCleaned := 0
+	for i := len(ip.reservationTable) - size/10; i < len(ip.reservationTable); i++ {
+		framesCleaned += 1
 		for x := range ip.reservationTable[i] {
 			for y := range ip.reservationTable[i][x] {
 				ip.reservationTable[i][x][y] = free
@@ -410,6 +432,18 @@ func (ip *IntersectionPolicyFcfs) relocateTableIfNecessary(ts types.Millisecond)
 
 
 func getOccupingGrids(x types.XCoord, y types.YCoord, alpha types.Angle) []grid {
+	debug := false
+
+	if debug {
+		res := []grid{}
+		for x := 0; x <gridNoX; x++ {
+			for y := 0; y < gridNoY; y++ {
+				res = append(res, grid{x:x, y:y})
+			}
+		}
+		return res
+	}
+
 	res := []grid{}
 
 	r := 0.5 * math.Sqrt(constants.VehicleLength*constants.VehicleLength+constants.VehicleWidth*constants.VehicleWidth)
@@ -434,7 +468,7 @@ func getOccupingGrids(x types.XCoord, y types.YCoord, alpha types.Angle) []grid 
 	leftRearX := x + r*math.Cos(math.Pi-leftRear)
 	leftRearY := y - r*math.Cos(math.Pi/2-leftRear)
 
-	const marginMeters = 0.25
+	const marginMeters = 0.0
 	margin := int(math.Floor(marginMeters / gridSize)) // [m] -> pixels
 	drawRectange := func(x1, y1, x2, y2, x3, y3, x4, y4 int) {
 

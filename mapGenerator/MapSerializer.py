@@ -1,12 +1,6 @@
 import json
 import math
 
-# NODES_FILE = "visualization/public/nodes.ndjson"
-# EDGES_FILE = "visualization/public/edges.ndjson"
-# META_FILE = "visualization/public/graph.json"
-
-GRAPH_FILE = "visualization/public/intersection_graph.json"
-
 class MapSerializer:
 
     def serialize(self, graph):
@@ -23,28 +17,7 @@ class MapSerializer:
         bbox = {"north": max_lat, "south": min_lat, "west": min_lon, "east": max_lon,
                 "width": graph["mapWidth"], "height": graph["mapHeight"]}
 
-        meta = {
-            "graph": bbox,
-            "conflictZone": graph["conflictZone"],
-        }
-
         self.add_coords(bbox, graph)
-
-        # with open(META_FILE, "w") as f:
-        #     json.dump(meta, f)
-        #
-        # with open(NODES_FILE, "w") as f:
-        #     for n in graph["nodes"]:
-        #         json.dump(n, f)
-        #         f.write("\n")
-        #
-        # with open(EDGES_FILE, "w") as f:
-        #     for e in graph["edges"]:
-        #         json.dump(e, f)
-        #         f.write("\n")
-
-        with open(GRAPH_FILE, "w") as f:
-            json.dump(graph, f, indent=4)
 
         return json.dumps(graph)
 

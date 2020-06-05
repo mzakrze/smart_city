@@ -90,8 +90,8 @@ func (v *VehicleActor) Ping(ts types.Millisecond) {
 	case beforeIntersectionHasReservation:
 		if v.isCenterInConflictZone() {
 			ts0 := v.reservation.arriveConflictZoneTs
-			if math.Abs(float64(ts - ts0)) > 100 {
-				//panic("Oops")
+			if math.Abs(float64(ts - ts0)) > 50 {
+				panic("Oops")
 			}
 			v.State = atIntersection
 		}
