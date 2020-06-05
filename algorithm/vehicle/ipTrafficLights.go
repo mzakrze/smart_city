@@ -69,7 +69,7 @@ func (ip * IntersectionPolicyTrafficLights) ProcessMsg(m DsrcV2RMessage) {
 		return
 	}
 
-	if ip.prevApproachPerLineTs[ip.nodeIdToLineId[m.EntryPointId]] + 1000 > m.ApproachConflictZoneMinTs {
+	if ip.prevApproachPerLineTs[ip.nodeIdToLineId[m.EntryPointId]] + 1300 > m.ApproachConflictZoneMinTs {
 		return
 	}
 

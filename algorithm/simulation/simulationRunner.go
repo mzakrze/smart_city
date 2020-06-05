@@ -148,6 +148,28 @@ func (r *SimulationRunner) spawnNewVehicles(ts types.Millisecond) []*vehicle.Veh
 
 
 func (r *SimulationRunner) createRandomVehicleIfEntryPointAvailable(ts types.Millisecond) *vehicle.VehicleActor {
+	possibleLaneExitpoints := make(map[int][]int)
+
+	legalWays := func(lane int, way types.WayId) []types.WayId {
+		// TODO - narazie obsługa tylko 2 pasów
+		if lane == 0 {
+			way -= 1
+			first := (way + 1) % 4 + 1 //left
+			second := (way + 2) % 4 + 1 //straight
+			return []types.WayId{first, second}
+		}
+		if lane == 1 {
+			way -= 1
+			first := (way + 3) % 4 + 1 //left
+			second := (way + 2) % 4 + 1 //straight
+			return []types.WayId{first, second}
+		}
+		panic("Oops")
+	}
+
+	possibleLaneExitpoints[0] = []int{1}
+	possibleLaneExitpoints[1] = []int{}
+	possibleLaneExitpoints[2] = []int{1,2}
 	getRandomAvailableEntrypoint := func() (*util.Node, types.Meter) {
 		availableEntrypoints := []*util.Node{}
 		spareDistance := make(map[types.NodeId]types.Meter)
@@ -182,7 +204,13 @@ func (r *SimulationRunner) createRandomVehicleIfEntryPointAvailable(ts types.Mil
 		possibleExitpoints := []*util.Node{}
 		for _, e := range r.graph.Exitpoints {
 			if e.ExitPointId == entrypoint.EntryPointId && e.WayId != entrypoint.WayId {
-				possibleExitpoints = append(possibleExitpoints, e)
+
+				for _, v := range legalWays(entrypoint.EntryPointId, entrypoint.WayId) {
+					if v == e.WayId {
+						possibleExitpoints = append(possibleExitpoints, e)
+					}
+				}
+
 			}
 		}
 		return possibleExitpoints[rand.Intn(len(possibleExitpoints))]

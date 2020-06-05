@@ -23,7 +23,7 @@ func ReadConfiguration(filePath string) (Configuration, error) {
 	// TODO read from file
 	c := Configuration{
 		VehiclesPerMinute: 120,
-		IntersectionPolicy: "trafficLights",
+		IntersectionPolicy: "fcfs",
 		SimulationDuration: 60,
 		VehicleMaxSpeed: 10,
 		RandomSeed: 42,
