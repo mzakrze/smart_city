@@ -6,7 +6,6 @@ import (
 	"algorithm/types"
 	"algorithm/util"
 	"algorithm/vehicle"
-	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -61,8 +60,11 @@ func SimulationRunnerSingleton(
 }
 
 type ShortStats struct {
-	Throughput int // vehicles per minute
-	AverageDelay int // seconds (rounded)
+	IntersectionThroughput float64 // vehicles per minute
+	VehicleAverageDelay    float64 // seconds
+	MessagesDelivered      int
+	MessagesLost           int
+	MessagesAvgDelay       types.Millisecond
 }
 
 func (r *SimulationRunner) RunSimulation() ShortStats {
@@ -76,7 +78,7 @@ func (r *SimulationRunner) RunSimulation() ShortStats {
 		return (ts + constants.SimulationStepInterval) % 1000 == 0
 	}
 	simulationDurationElapsed := func() bool {
-		return ts >= types.Millisecond((constants.WarmupSeconds + r.configuration.SimulationDuration) * 1000)
+		return ts >= types.Millisecond((r.configuration.SimulationWarmUp + r.configuration.SimulationDuration) * 1000)
 	}
 	simulationFinished := func() bool {
 		return simulationDurationElapsed() && isFullSecond()
@@ -145,20 +147,20 @@ func (r *SimulationRunner) createRandomVehicleIfEntryPointAvailable(ts types.Mil
 	possibleLaneExitpoints := make(map[int][]int)
 
 	legalWays := func(lane int, way types.WayId) []types.WayId {
-		// TODO - narazie obsługa tylko 2 pasów
 		if lane == 0 {
 			way -= 1
 			first := (way + 1) % 4 + 1 //left
 			second := (way + 2) % 4 + 1 //straight
 			return []types.WayId{first, second}
 		}
-		if lane == 1 {
+		if lane == r.configuration.MapLanes - 1 {
 			way -= 1
-			first := (way + 3) % 4 + 1 //left
+			first := (way + 3) % 4 + 1 //right
 			second := (way + 2) % 4 + 1 //straight
 			return []types.WayId{first, second}
 		}
-		panic("Oops")
+		way -= 1
+		return []types.WayId{(way + 2) % 4 + 1} //straight
 	}
 
 	possibleLaneExitpoints[0] = []int{1}
@@ -245,10 +247,7 @@ func (r *SimulationRunner) cleanUpVehicles(ts types.Millisecond) []*vehicle.Vehi
 }
 
 func (r *SimulationRunner) getStatitistics() ShortStats {
-	sent, lost, d := r.communicationLayer.GetStats()
-	fmt.Println("Sent:", sent, ", lost:", lost, ", avgDelay:", d)
-
-	timeToIgnore := types.Millisecond(constants.WarmupSeconds * 1000)
+	timeToIgnore := types.Millisecond(r.configuration.SimulationWarmUp * 1000)
 
 	vehiclesCounter := 0
 	sumDelay := types.Millisecond(0)
@@ -263,13 +262,17 @@ func (r *SimulationRunner) getStatitistics() ShortStats {
 		}
 	}
 
-	avgDelay := int(float64(sumDelay) / float64(vehiclesCounter) / 1000)
+	avgDelay := float64(sumDelay) / float64(vehiclesCounter) / 1000
 	if vehiclesCounter == 0 {
 		avgDelay = 0
 	}
+	msgDelivered, msgLost, msgDelay := r.communicationLayer.GetStats()
 	return ShortStats{
-		Throughput: vehiclesCounter * 60 / r.configuration.SimulationDuration,
-		AverageDelay: avgDelay,
+		IntersectionThroughput: float64(vehiclesCounter * 60) / float64(r.configuration.SimulationDuration),
+		VehicleAverageDelay:    avgDelay,
+		MessagesLost:           msgLost,
+		MessagesDelivered:      msgDelivered,
+		MessagesAvgDelay:       msgDelay,
 	}
 
 }

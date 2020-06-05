@@ -4,6 +4,8 @@ WORKDIR /go/src/algorithm/
 
 RUN go get -d -v github.com/fluent/fluent-logger-golang/fluent
 RUN go get -d -v github.com/cheggaaa/pb/v3
+RUN go get -d -v github.com/BurntSushi/toml
+
 
 COPY constants ./constants
 COPY logging ./logging

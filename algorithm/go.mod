@@ -9,4 +9,5 @@ require (
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/philhofer/fwd v1.0.0 // indirect
 	github.com/tinylib/msgp v1.1.2 // indirect
+	gopkg.in/yaml.v2 v2.3.0
 )

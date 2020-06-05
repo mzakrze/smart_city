@@ -70,13 +70,13 @@ type message struct {
 func CommunicationLayerSingleton(proxy *AllVehicleProxy, configuration util.Configuration) *CommunicationLayer {
 	if instanceCommunication == nil {
 		instanceCommunication = &CommunicationLayer{
-			proxy: proxy,
-			messages: []message{},
+			proxy:                   proxy,
+			messages:                []message{},
 			deliveryLossProbability: configuration.DsrcMsgLossProbability,
-			deliveryAvgDelay: types.Millisecond(configuration.DsrcMsgAvgDelay),
-			statsLost: 0,
-			statsSent: 0,
-			statsSumDelay: 0,
+			deliveryAvgDelay:        types.Millisecond(configuration.DsrcMsgAvgDelay),
+			statsLost:               0,
+			statsDelivered:          0,
+			statsSumDelay:           0,
 		}
 	}
 	return instanceCommunication
@@ -116,8 +116,8 @@ func (c *CommunicationLayer) SendDsrcR2V(msg DsrcR2VMessage) {
 }
 
 func (c *CommunicationLayer) GetStats() (int, int, types.Millisecond) {
-	avgDelay := types.Millisecond(float64(c.statsSumDelay) / float64(c.statsSent))
-	return c.statsSent, c.statsLost, avgDelay
+	avgDelay := types.Millisecond(float64(c.statsSumDelay) / float64(c.statsDelivered))
+	return c.statsDelivered, c.statsLost, avgDelay
 }
 
 func (c *CommunicationLayer) randLDelayAndDeliveryUpdateStats() (types.Millisecond, bool) {
@@ -126,7 +126,7 @@ func (c *CommunicationLayer) randLDelayAndDeliveryUpdateStats() (types.Milliseco
 		return 0, false
 	}
 	delay := types.Millisecond(rand.Float64() * 2.0 * float64(c.deliveryAvgDelay))
-	c.statsSent += 1
+	c.statsDelivered += 1
 	c.statsSumDelay += delay
 	return delay, true
 }
@@ -178,13 +178,13 @@ func (c *CommunicationLayer) IntersectionManagerReceive(ts types.Millisecond) []
 
 var instanceCommunication *CommunicationLayer = nil
 type CommunicationLayer struct {
-	proxy *AllVehicleProxy
-	messages []message
+	proxy                   *AllVehicleProxy
+	messages                []message
 	deliveryLossProbability float64
-	deliveryAvgDelay types.Millisecond
-	statsLost int
-	statsSent int
-	statsSumDelay types.Millisecond
+	deliveryAvgDelay        types.Millisecond
+	statsLost               int
+	statsDelivered          int
+	statsSumDelay           types.Millisecond
 }
 
 

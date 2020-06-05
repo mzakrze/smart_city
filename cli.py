@@ -37,24 +37,37 @@ def read_args():
     return args.configuration_file
 
 def parse_config(path):
-    try:
-        with open(path) as f:
-            content = f.read()
-    except:
-        print("Error while reading config file")
-        raise
-
-    configParser = configparser.RawConfigParser()
-    configParser.read(path)
+    # try:
+    #     with open(path) as f:
+    #         content = f.read()
+    # except:
+    #     print("Error while reading config file")
+    #     raise
+    #
+    # configParser = configparser.RawConfigParser()
+    # configParser.read(path)
+    #
+    # def trimComment(s):
+    #     if "#" not in s:
+    #         return s
+    #     return s[0:s.index("#")].strip()
 
     config = Config()
-    config.vpm = int(configParser.get('simulation', 'vehicles_per_minute'))
-    config.ip = configParser.get('simulation', 'intersection_policy')
-    config.duration = int(configParser.get('simulation', 'duration'))
-    config.map_type = configParser.get('simulation', 'map.type')
-    config.map_lanes = int(configParser.get('simulation', 'map.lanes'))
+    # config.vpm = int(trimComment(configParser.get('simulation', 'vehicles_per_minute')))
+    # config.ip = trimComment(configParser.get('simulation', 'intersection_policy'))
+    # config.duration = int(trimComment(configParser.get('simulation', 'duration')))
+    config.map_type = "junction_x" # trimComment(configParser.get('simulation', 'map.type'))
+    config.map_lanes = 2 # int(trimComment(configParser.get('simulation', 'map.lanes')))
+    # config.vehicle_weight = int(trimComment(configParser.get('simulation', 'vehicle.weight')))
+    # config.vehicle_power = int(trimComment(configParser.get('simulation', 'vehicle.power')))
+    # config.vehicle_braking_force = int(trimComment(configParser.get('simulation', 'vehicle.braking_force')))
+    # config.vehicle_max_angular_speed = float(trimComment(configParser.get('simulation', 'vehicle.max_angular_speed')))
+    # config.vehicle_max_speed_on_conflict_zone = int(trimComment(configParser.get('simulation', 'vehicle.max_speed_on_conflict_zone')))
+    # config.dsrc_loss_p = float(trimComment(configParser.get('simulation', 'dsrc.loss_p')))
+    # config.dsrc_avg_latency = int(trimComment(configParser.get('simulation', 'dsrc.avg_latency')))
+    # config.random_seed = int(trimComment(configParser.get('simulation', 'random_seed')))
 
-    return config, content
+    return config, ""
 
 
 def insert_to_elastic(graph_raw, config_raw):
@@ -71,6 +84,15 @@ def delete_old():
     r = requests.delete(url)
 
 def run_command(command):
+    # print("Building image ...")
+    # os.chdir("algorithm")
+    # os.system("docker build -t simulation_algorithm . -q")
+
+    # print("Running simulation ...")
+    # run_command("docker run --network smart_city_efk simulation_algorithm")
+    #
+    # print("CLI Finished.")
+    # print("Goto: localhost:3000")
     process = subprocess.Popen(shlex.split(command), stdout=subprocess.PIPE)
     while True:
         if process.poll() is not None:
@@ -90,14 +112,6 @@ if __name__ == "__main__":
     map_raw_json = generate_map_json("junction_x", config.map_lanes)
     insert_to_elastic(map_raw_json, config_raw)
 
-    print("Building image ...")
-    os.chdir("algorithm")
-    os.system("docker build -t simulation_algorithm . -q")
-
-    print("Running simulation ...")
-    run_command("docker run --network smart_city_efk simulation_algorithm")
-
-    print("CLI Finished.")
-    print("Goto: localhost:3000")
+    print("Done.")
 
 

@@ -4,7 +4,6 @@ import (
 	"algorithm/constants"
 	"algorithm/types"
 	"algorithm/util"
-	"fmt"
 	"math"
 )
 
@@ -138,12 +137,10 @@ func (ip *IntersectionPolicyTrafficLights) GetReplies(ts types.Millisecond) []Ds
 		if ip.currentWayId == 0 {
 			ip.currentWayId = 1 // efekt indeksowania od 1, trzeba dodatkowy warunek
 		}
-		fmt.Println("wayid:", ip.currentWayId)
 	}
 	if ip.isWaitPhase == false && ts - ip.currentWayStartedAt >= ip.millisecondsFree {
 		ip.isWaitPhase = true
 		ip.waitStartedAt = ts
-		fmt.Println("waiting")
 	}
 
 	res := ip.replies

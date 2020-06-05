@@ -1,24 +1,28 @@
 package main
 
 import (
-	"algorithm/constants"
 	"algorithm/logging"
 	"algorithm/simulation"
 	"algorithm/util"
 	"algorithm/vehicle"
 	"flag"
 	"fmt"
-	"github.com/fluent/fluent-logger-golang/fluent"
 	"github.com/cheggaaa/pb/v3"
+	"github.com/fluent/fluent-logger-golang/fluent"
 	"math/rand"
 	"time"
 )
 
 func main() {
 	dockerEnv := flag.Bool( "docker", false, "Is run in docker (effects host of elastic and fluent)")
-	confFilePath := flag.String("conf", "", "Path to configuration file")
-	visual := flag.Bool( "visual", false, "Safe vehicles location for visualization (store results in Elasticsearch)")
+	quiet := flag.Bool( "quiet", false, "Quiet progress bar")
+	logsOff := flag.Bool( "logsOff", false, "Safe vehicles location for visualization (store results in Elasticsearch)")
 	flag.Parse()
+
+	if flag.NArg() < 1 {
+		fmt.Println("Invalid use. Specify configuration file")
+	}
+	confFilePath := flag.Args()[0]
 
 	var elasticHost, fluentHost string
 	if *dockerEnv {
@@ -29,14 +33,14 @@ func main() {
 		fluentHost = "localhost"
 	}
 
-	util.ClearOldIndicesInElastic(elasticHost)
-
-	configuration, err := util.ReadConfiguration(*confFilePath); if err != nil { panic(err) }
+	configuration, err := util.ReadConfiguration(confFilePath); if err != nil { panic(err) }
 	if configuration.RandomSeed != 0 {
 		rand.Seed(configuration.RandomSeed)
 	} else {
 		rand.Seed(time.Now().Unix())
 	}
+
+	util.ClearOldIndicesInElastic(elasticHost)
 
 	// create dependencies
 	graph, err := util.ReadGraph(elasticHost); if err != nil { panic(err) }
@@ -47,7 +51,7 @@ func main() {
 	collisionDetector := vehicle.NewCollisionDetector(allVehiclesProxy)
 	intersectionManager, err := vehicle.IntersectionManagerSingleton(graph, communicationLayer, configuration); if err != nil { panic(err) }
 	resultLogger := logging.NewNoOpLogger()
-	if *visual {
+	if *logsOff == false {
 		fluentLogger, err := fluent.New(fluent.Config{FluentHost: fluentHost}); if err != nil { panic(err) }; defer fluentLogger.Close()
 		resultLogger = logging.ResultsLoggerSingleton(fluentLogger, graph.MapWidth, graph.MapWidth, configuration.SimulationDuration)
 	}
@@ -63,9 +67,10 @@ func main() {
 		resultLogger,
 		collisionDetector)
 
+	if ! *quiet {
+		go runProgressTracker(simulationRunner, &configuration)
+	}
 
-
-	//go runProgressTracker(simulationRunner, &configuration)
 
 	/* --------------------------- */
 	/* ----- Run Simulation ------ */
@@ -74,15 +79,17 @@ func main() {
 
 
 	fmt.Println("Simulation finished")
-	fmt.Println("Throughput:",stats.Throughput)
-	fmt.Println("Average delay:",stats.AverageDelay)
-
+	fmt.Println("Intersection throughput:",stats.IntersectionThroughput)
+	fmt.Println("Vehicle delay:",stats.VehicleAverageDelay)
+	fmt.Println("Messages delivered no:",stats.MessagesDelivered)
+	fmt.Println("Messages lost no:",stats.MessagesLost)
+	fmt.Println("Messages average delay:",stats.MessagesAvgDelay)
 }
 
 
 func runProgressTracker(s *simulation.SimulationRunner, c *util.Configuration) {
 
-	seconds := c.SimulationDuration + constants.WarmupSeconds
+	seconds := c.SimulationDuration + c.SimulationWarmUp
 
 	bar := pb.StartNew(seconds)
 
