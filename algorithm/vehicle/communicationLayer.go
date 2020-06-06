@@ -83,7 +83,7 @@ func CommunicationLayerSingleton(proxy *AllVehicleProxy, configuration util.Conf
 }
 
 func (c *CommunicationLayer) SendDsrcV2V(msg DsrcV2VMessage) {
-	for _, v := range c.proxy.GetAllVehicles() {
+	for _, v := range c.proxy.GetAllActiveVehicles() {
 		if v.Id == msg.sender {
 			continue
 		}

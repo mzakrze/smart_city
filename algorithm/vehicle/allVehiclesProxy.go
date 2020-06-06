@@ -1,20 +1,28 @@
 package vehicle
 
+import "algorithm/types"
+
 func AllVehiclesProxySingleton() *AllVehicleProxy {
+	enqueuedVehicles := map[types.WayId][]*VehicleActor {
+		1: []*VehicleActor{},
+		2: []*VehicleActor{},
+		3: []*VehicleActor{},
+		4: []*VehicleActor{},
+	}
 	if proxyInstance == nil {
-		proxyInstance = &AllVehicleProxy{}
+		proxyInstance = &AllVehicleProxy{
+			activeVehicles: []*VehicleActor{},
+			enqueuedVehicles: enqueuedVehicles,
+			finishedVehicles: []*VehicleActor{},
+		}
 	}
 	return proxyInstance
 }
 
-func (p *AllVehicleProxy) RegisterVehicle(actor *VehicleActor) {
-	p.registeredVehicles = append(p.registeredVehicles, actor)
-}
-
-func (p*AllVehicleProxy) UnregisterVehicle(actor *VehicleActor) {
+func (p*AllVehicleProxy) VehicleFinished(actor *VehicleActor) {
 	var index = -1
-	for i := range p.registeredVehicles {
-		if p.registeredVehicles[i].Id == actor.Id {
+	for i := range p.activeVehicles {
+		if p.activeVehicles[i].Id == actor.Id {
 			index = i
 			break
 		}
@@ -23,26 +31,50 @@ func (p*AllVehicleProxy) UnregisterVehicle(actor *VehicleActor) {
 		panic("Illegal State")
 	}
 
-	p.registeredVehicles = append(p.registeredVehicles[:index], p.registeredVehicles[index + 1:]...)
+	p.activeVehicles = append(p.activeVehicles[:index], p.activeVehicles[index + 1:]...)
+	p.finishedVehicles = append(p.finishedVehicles, actor)
 }
 
-func (p*AllVehicleProxy) GetAllVehicles() []*VehicleActor {
-	return p.registeredVehicles
+func (p*AllVehicleProxy) GetAllActiveVehicles() []*VehicleActor {
+	return p.activeVehicles
 }
 
-func (p *AllVehicleProxy) AllVehiclesDone() bool {
-	for _, v := range p.registeredVehicles {
-		if v.HasFinished == false {
-			return false
+func (p *AllVehicleProxy) Enqueue(v *VehicleActor) {
+	p.enqueuedVehicles[v.EntryPoint.WayId] = append(p.enqueuedVehicles[v.EntryPoint.WayId], v)
+}
+
+func (p *AllVehicleProxy) NextQueued(wId types.WayId) *VehicleActor {
+	if len(p.enqueuedVehicles[wId]) == 0 {
+		return nil
+	}
+	return p.enqueuedVehicles[wId][0]
+}
+
+func (p *AllVehicleProxy) RegisterVehicle(v *VehicleActor) {
+	for _, wId := range []types.WayId{1,2,3,4} {
+		if len(p.enqueuedVehicles[wId]) > 0 && p.enqueuedVehicles[wId][0].Id == v.Id {
+			p.enqueuedVehicles[wId] = p.enqueuedVehicles[wId][1:]
+			p.activeVehicles = append(p.activeVehicles, v)
+			return
 		}
 	}
-	return true
+
+	panic("Oops")
 }
 
+func (p *AllVehicleProxy) GetAllVehiclesIntroduced() []*VehicleActor {
+	res := []*VehicleActor{}
 
+	res = append(res, p.activeVehicles...)
+	res = append(res, p.finishedVehicles...)
+
+	return res
+}
 
 var proxyInstance *AllVehicleProxy = nil
 type AllVehicleProxy struct {
-	registeredVehicles []*VehicleActor
+	activeVehicles []*VehicleActor
+	enqueuedVehicles map[types.WayId][]*VehicleActor
+	finishedVehicles []*VehicleActor
 }
 

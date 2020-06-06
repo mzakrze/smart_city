@@ -48,7 +48,7 @@ func (sensor *SensorLayer) ScanVehiclesAhead (vehicle *VehicleActor) (float64, t
 
 	var collidedWith *VehicleActor = nil
 	collides := func (x, y types.Meter) bool {
-		vehicles := sensor.proxy.GetAllVehicles()
+		vehicles := sensor.proxy.GetAllActiveVehicles()
 		for i, v := range vehicles {
 			if v.Id == vehicle.Id {
 				continue
@@ -105,7 +105,7 @@ func (sensor *SensorLayer) ScanVehiclesAhead_old (vehicle *VehicleActor) float64
 	}
 
 	closest := MaxDistanceMeasurement
-	for _, v := range sensor.proxy.GetAllVehicles() {
+	for _, v := range sensor.proxy.GetAllActiveVehicles() {
 		if v.Id != vehicle.Id {
 			closest = math.Min(getDist(v), closest)
 		}

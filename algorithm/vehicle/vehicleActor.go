@@ -20,8 +20,8 @@ type VehicleActor struct {
 	HasFinished bool
 	State       vehicleState
 
-	entryPoint                             *util.Node
-	exitPoint                              *util.Node
+	EntryPoint                             *util.Node
+	ExitPoint                              *util.Node
 	roadGraph                              *util.Graph
 	sensor                                 *SensorLayer
 	networkCard                            *CommunicationLayer
@@ -34,18 +34,19 @@ type VehicleActor struct {
 	AlphaInitiated                         bool
 	hipotheticalPlan                       map[types.Millisecond]types.MetersPerSecond
 	lastMsgSentTs                          types.Millisecond
+	EnteredIntersection                    types.Millisecond
+	ExitedIntersection                     types.Millisecond
 }
 
 
-func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitpoint *util.Node, initSpeed types.MetersPerSecond, roadGraph *util.Graph, sensor *SensorLayer, nc *CommunicationLayer) *VehicleActor {
+func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitpoint *util.Node, roadGraph *util.Graph, sensor *SensorLayer, nc *CommunicationLayer) *VehicleActor {
 	v := VehicleActor{
 		Id:             id,
 		X:              entrypoint.X,
 		Y:              entrypoint.Y,
-		entryPoint:     entrypoint,
-		exitPoint:      exitpoint,
+		EntryPoint:     entrypoint,
+		ExitPoint:      exitpoint,
 		EdgeAt:         entrypoint.EdgesFrom[0],
-		Speed:          initSpeed,
 		Alpha:          0.0,
 		AlphaInitiated: false,
 		Acc:            0.0,
@@ -54,17 +55,20 @@ func NewVehicleActor(id types.VehicleId, ts types.Millisecond, entrypoint, exitp
 		sensor:         sensor,
 		State:          beforeIntersectionNotAllowed,
 		networkCard:    nc,
-		lastMsgSentTs: 	0,
+		lastMsgSentTs:  0,
+		EnteredIntersection: math.MinInt32,
+		ExitedIntersection: math.MaxInt32,
 	}
 
 	v.planRoute()
-
-	v.planApproachConflictZoneNoReservation(ts)
 
 	return &v
 }
 
 func (v *VehicleActor) Ping(ts types.Millisecond) {
+	if v.AlphaInitiated == false {
+		v.planApproachConflictZoneNoReservation(ts)
+	}
 
 	v.checkForMessages(ts)
 
@@ -94,6 +98,7 @@ func (v *VehicleActor) Ping(ts types.Millisecond) {
 				panic("Oops")
 			}
 			v.State = atIntersection
+			v.EnteredIntersection = ts
 		}
 	case atIntersection:
 		if v.isCenterInConflictZone() == false {
@@ -102,6 +107,7 @@ func (v *VehicleActor) Ping(ts types.Millisecond) {
 				//panic("Oops")
 			}
 			v.State = afterIntersection
+			v.ExitedIntersection = ts
 		}
 	}
 }
@@ -332,8 +338,8 @@ func (vehicle *VehicleActor) sendRequestReservation(ts types.Millisecond) {
 		ConflictZoneNodeExit: exit,
 		MaxSpeedOnCurve: vehicle.calculateMaxSpeedOnCurve(),
 		IsTurning: vehicle.isTurning(),
-		EntryPointId: vehicle.entryPoint.Id,
-		ExitPointId: vehicle.exitPoint.Id,
+		EntryPointId: vehicle.EntryPoint.Id,
+		ExitPointId: vehicle.ExitPoint.Id,
 		Route: vehicle.getRouteCoordinates(),
 	}
 	vehicle.networkCard.SendDsrcV2R(msg)
@@ -405,8 +411,8 @@ func (vehicle *VehicleActor) sendRequestReservationPlatooning(ts types.Milliseco
 		ConflictZoneNodeExit:      exit,
 		MaxSpeedOnCurve:           vehicle.calculateMaxSpeedOnCurve(),
 		IsTurning:                 vehicle.isTurning(),
-		EntryPointId:              vehicle.entryPoint.Id,
-		ExitPointId:               vehicle.exitPoint.Id,
+		EntryPointId:              vehicle.EntryPoint.Id,
+		ExitPointId:               vehicle.ExitPoint.Id,
 		Route:                     vehicle.getRouteCoordinates(),
 	}
 	vehicle.networkCard.SendDsrcV2R(msg)
@@ -422,7 +428,7 @@ func (v *VehicleActor) isFirstToConflictZone() bool {
 func (v *VehicleActor) getRouteCoordinates() []types.Location {
 	if v.isTurning() {
 		res := make([]types.Location, 0)
-		res = append(res, types.Location{X: v.entryPoint.X, Y: v.entryPoint.Y})
+		res = append(res, types.Location{X: v.EntryPoint.X, Y: v.EntryPoint.Y})
 
 		for i := 1 ; i < len(v.route); i++ {
 			if v.route[i].IsArc == false {
@@ -517,7 +523,7 @@ func (v *VehicleActor) planRoute() {
 	path := []*util.Edge{}
 
 	visit = func (node *util.Node) bool {
-		if node.Id == v.exitPoint.Id {
+		if node.Id == v.ExitPoint.Id {
 			return true
 		}
 		for i := range node.EdgesFrom {
@@ -532,7 +538,7 @@ func (v *VehicleActor) planRoute() {
 		return false
 	}
 
-	res := visit(v.entryPoint)
+	res := visit(v.EntryPoint)
 
 	if res == false || len(path) == 0 {
 		panic("Vehicle route not found")
@@ -542,7 +548,7 @@ func (v *VehicleActor) planRoute() {
 }
 
 func (v *VehicleActor) isTurning() bool {
-	diff := v.entryPoint.WayId - v.exitPoint.WayId
+	diff := v.EntryPoint.WayId - v.ExitPoint.WayId
 
 	if diff == -1 || diff == 3 {
 		return true

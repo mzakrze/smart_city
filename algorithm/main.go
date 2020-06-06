@@ -10,6 +10,7 @@ import (
 	"github.com/cheggaaa/pb/v3"
 	"github.com/fluent/fluent-logger-golang/fluent"
 	"math/rand"
+	"os"
 	"time"
 )
 
@@ -21,6 +22,7 @@ func main() {
 
 	if flag.NArg() < 1 {
 		fmt.Println("Invalid use. Specify configuration file")
+		os.Exit(1)
 	}
 	confFilePath := flag.Args()[0]
 

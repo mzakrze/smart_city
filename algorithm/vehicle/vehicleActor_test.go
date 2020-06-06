@@ -234,8 +234,10 @@ func TestPlatooningReservation(t *testing.T) {
 	v1 := NewVehicleActor(1, 0, &roadGraph.AllNodes[0], &roadGraph.AllNodes[3], 10, roadGraph, s, nc)
 	v2 := NewVehicleActor(2, v2AppearsTs, &roadGraph.AllNodes[0], &roadGraph.AllNodes[3], 10, roadGraph, s, nc)
 
-	p.RegisterVehicle(v1)
-	p.RegisterVehicle(v2)
+	p.Enqueue(v1)
+	p.RegisterNextVehicleFromQueue()
+	p.Enqueue(v2)
+	p.RegisterNextVehicleFromQueue()
 
 	handleRequest := func (vId types.VehicleId, ts types.Millisecond, req DsrcV2RMessage) DsrcR2VMessage {
 		const distOnConflictZone = 20.0
