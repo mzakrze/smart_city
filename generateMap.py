@@ -3,12 +3,20 @@
 import sys
 sys.path.insert(1, 'mapGenerator')
 from generate import generate_map_json
+from enum import Enum
 import argparse
 import requests
 import json
 import time
 
 simulation_name = "simulation"
+
+class MapGeneratorType(Enum):
+    junction_x = 'junction_x'
+    roundabout = 'roundabout'
+
+    def __str__(self):
+        return self.value
 
 class Config:
     def __init__(self):
@@ -27,10 +35,11 @@ def read_args():
     parser = argparse.ArgumentParser(description='Generates map and inserts to Elasticsearch')
 
     parser.add_argument('--lanes', help='Number of lanes in the intersection', type=int, required=True)
+    parser.add_argument('--type', help='Type of intersection', type=MapGeneratorType, required=True)
 
     args = parser.parse_args()
 
-    return args.lanes
+    return args.lanes, args.type
 
 
 def insert_to_elastic(graph_raw):
@@ -57,12 +66,19 @@ def delete_old():
         sys.exit(1)
 
 if __name__ == "__main__":
-    map_lanes = read_args()
+    map_lanes, map_type = read_args()
     print("Deleting old map from Elasticsearch ...")
     delete_old()
 
-    print("Generating map ...")
-    map_raw_json = generate_map_json("junction_x", map_lanes)
+    if map_type == MapGeneratorType.junction_x:
+        print("Generating map ...")
+        map_raw_json = generate_map_json("junction_x", map_lanes)
+    elif map_type == MapGeneratorType.roundabout:
+        print("Generating map ...")
+        map_raw_json = generate_map_json("roundabout", map_lanes)
+    else:
+        print("Error: illegal intersection type")
+        sys.exit(1)
     print("Indexing generated map in Elasticsearch ...")
     insert_to_elastic(map_raw_json)
 

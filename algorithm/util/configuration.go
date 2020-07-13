@@ -9,16 +9,16 @@ type Configuration struct {
 	VehiclesPerMinute             int
 	IntersectionPolicy            string
 	SimulationDuration            int
-	SimulationWarmUp			  int
+	SimulationWarmUp              int
 	RandomSeed                    int64
 	VehiclePower                  float64
 	VehicleBrakingForce           float64
 	VehicleWeight                 float64
 	VehicleMaxAngularSpeed        float64
 	VehicleMaxSpeedOnConflictZone float64
-	DsrcMsgLossProbability		  float64
-	DsrcMsgAvgDelay				  int
-	MapLanes				      int
+	DsrcMsgLossProbability        float64
+	DsrcMsgAvgDelay               int
+	PlatooningOn                  bool
 }
 
 type config struct {
@@ -27,11 +27,8 @@ type config struct {
 		Ip 			string `yaml:"intersection_policy"`
 		Duration	int `yaml:"duration"`
 		WarmUp 		int `yaml:"warmup"`
+		Platooning	string `yaml:"platooning"`
 	} `yaml:"simulation"`
-	Map struct {
-		Type 	string `yaml:"type"`
-		Lanes 	int `yaml:"lanes"`
-	} `yaml:"map"`
 	Vehicle struct {
 		Weight 					int `yaml:"weight"`
 		Power 					int `yaml:"power"`
@@ -81,6 +78,6 @@ func ReadConfiguration(filePath string) (Configuration, error) {
 		VehicleMaxSpeedOnConflictZone: float64(cfg.Vehicle.MaxSpeedOnConflictZone),
 		DsrcMsgLossProbability: cfg.Dsrc.LossP,
 		DsrcMsgAvgDelay: cfg.Dsrc.AvgLatency,
-		MapLanes: cfg.Map.Lanes,
+		PlatooningOn: cfg.Simulation.Platooning == "on",
 	}, nil
 }

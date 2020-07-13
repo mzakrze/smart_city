@@ -27,7 +27,7 @@ type IResultsLogger interface {
 	SimulationStarted(time.Time)
 	SimulationFinished(time.Time)
 	VehicleStepReport(types.VehicleId, types.Millisecond, types.XCoord, types.YCoord, types.Angle, types.MetersPerSecond, types.MetersPerSecond2, int)
-	VehicleFinished(id types.VehicleId, ts types.Millisecond)
+	VehicleFinished(id types.VehicleId, ts types.Millisecond, from types.WayId, to types.WayId)
 }
 
 type iResultsLoggerWrapper struct {
@@ -46,8 +46,8 @@ func (logger iResultsLoggerWrapper) VehicleStepReport(vId types.VehicleId, ts ty
 	logger.wrapper.VehicleStepReport(vId, ts, x, y, alpha, speed, acc, state)
 }
 
-func (logger iResultsLoggerWrapper) VehicleFinished(id types.VehicleId, ts types.Millisecond) {
-	logger.wrapper.VehicleFinished(id, ts)
+func (logger iResultsLoggerWrapper) VehicleFinished(id types.VehicleId, ts types.Millisecond, from types.WayId, to types.WayId) {
+	logger.wrapper.VehicleFinished(id, ts, from, to)
 }
 
 
@@ -84,6 +84,8 @@ func ResultsLoggerSingleton(logger iResultLogger, mapWidth, mapHeight types.Mete
 			intersectionLogVehiclesArrive: make(map[types.Second]int),
 			intersectionLogVehiclesLeave: make(map[types.Second]int),
 			simulationDurationSeconds: simulationDurationSeconds,
+			vId2FromWay: make(map[types.VehicleId]types.WayId),
+			vId2ToWay: make(map[types.VehicleId]types.WayId),
 		}
 	}
 	return iResultsLoggerWrapper{wrapper: instance}
@@ -121,11 +123,13 @@ func (f *resultsLogger) VehicleStepReport(id types.VehicleId, ts types.Milliseco
 	}
 }
 
-func (f *resultsLogger) VehicleFinished(id types.VehicleId, ts types.Millisecond) {
+func (f *resultsLogger) VehicleFinished(id types.VehicleId, ts types.Millisecond, from types.WayId, to types.WayId) {
 	if ts % 1000 != 990 {
 		panic("Premise broken :( Vehicle should finish only on full second minus step interval")
 	}
 	f.intersectionLogVehiclesLeave[f.currentSecond] += 1
+	f.vId2FromWay[id] = from
+	f.vId2ToWay[id] = to
 	f.sendVehicleLogAndFlush(id, ts)
 	if ts < 1000 * types.Millisecond(f.simulationDurationSeconds) {
 		f.vehiclesFinishedThroughput += 1
@@ -159,8 +163,10 @@ type resultsLogger struct {
 
 	intersectionLogVehiclesArrive map[types.Second]int
 	intersectionLogVehiclesLeave  map[types.Second]int
-	simulationDurationSeconds            int
-	vehiclesFinishedThroughput			int
+	simulationDurationSeconds     int
+	vehiclesFinishedThroughput    int
+	vId2FromWay                   map[types.VehicleId]types.WayId
+	vId2ToWay                     map[types.VehicleId]types.WayId
 }
 
 
@@ -290,6 +296,8 @@ func (f *resultsLogger) sendVehicleLogAndFlush(id types.VehicleId, leaveTs types
 		"duration": fmt.Sprintf("%d", duration),
 		"speed_array": speedJson,
 		"acc_array": accJson,
+		"way_from": fmt.Sprintf("%d", f.vId2FromWay[id]),
+		"way_to": fmt.Sprintf("%d", f.vId2ToWay[id]),
 	}
 
 	err = f.logger.Post(vehicleTag, msg); if err != nil { panic(err) }

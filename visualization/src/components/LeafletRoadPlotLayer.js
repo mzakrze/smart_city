@@ -78,13 +78,18 @@ const LeafletRoadPlotLayer = L.CanvasLayer.extend({
             ctx.beginPath();
             ctx.moveTo(f.x, f.y);
             ctx.lineTo(t.x, t.y);
-            ctx.strokeStyle = "#555555";
+            ctx.strokeStyle = "#343434";
             ctx.lineWidth = laneWithPixels;
             ctx.stroke()
 
         }
 
+        let guard = 100;
         let paintIt = (nId) => {
+            guard -= 1;
+            if (guard < 0) {
+                return
+            }
             let nodeFrom = this.theGraph.nodes[nId]
             for (let i = 0; i < 5; i++) {
                 nId = next[nId]
@@ -101,9 +106,8 @@ const LeafletRoadPlotLayer = L.CanvasLayer.extend({
             ctx.beginPath();
             ctx.moveTo(f.x, f.y);
             ctx.lineTo(t.x, t.y);
-            ctx.strokeStyle = "#555555";
+            ctx.strokeStyle = "#343434";
             ctx.lineWidth = laneWithPixels;
-            console.log("painting")
             ctx.stroke()
 
             paintIt(nId)
@@ -111,7 +115,9 @@ const LeafletRoadPlotLayer = L.CanvasLayer.extend({
 
         for (let edge of entrypoints) {
             if (undefined != next[edge]) {
+                guard = 1000;
                 paintIt(next[edge][0]);
+                guard = 1000;
                 paintIt(next[edge][1]);
             }
         }

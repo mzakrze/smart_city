@@ -1,0 +1,340 @@
+Date: pon, 8 cze 2020, 16:15:52 CEST
+simulation:
+  vehicles_per_minute: PLACEHOLDER_vehicles_per_minute
+  intersection_policy: PLACEHOLDER_intersection_policy
+  duration: 120
+  warmup: 30
+map:
+  type: junction_x
+  lanes: 2
+vehicle:
+  weight: 1200
+  power: 120
+  braking_force: 3000.0
+  max_angular_speed: 0.8
+  max_speed_on_conflict_zone: 15.0
+dsrc:
+  loss_p: 0.0
+  avg_latency: 0.0
+random_seed: 42
+-------
+vrp=10, ip=trafficLights
+Simulation finished
+Intersection throughput: 9
+Vehicle delay: 17.19
+Messages delivered no: 4559
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=20, ip=trafficLights
+Simulation finished
+Intersection throughput: 21
+Vehicle delay: 16.462222222222223
+Messages delivered no: 6904
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=30, ip=trafficLights
+Simulation finished
+Intersection throughput: 30.5
+Vehicle delay: 19.67
+Messages delivered no: 9871
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=40, ip=trafficLights
+Simulation finished
+Intersection throughput: 38
+Vehicle delay: 22.656666666666666
+Messages delivered no: 13682
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=50, ip=trafficLights
+Simulation finished
+Intersection throughput: 47.5
+Vehicle delay: 25.89909090909091
+Messages delivered no: 15954
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=60, ip=trafficLights
+Simulation finished
+Intersection throughput: 49.5
+Vehicle delay: 37.93805194805195
+Messages delivered no: 16969
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=70, ip=trafficLights
+Simulation finished
+Intersection throughput: 53
+Vehicle delay: 39.72493975903615
+Messages delivered no: 18617
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=80, ip=trafficLights
+Simulation finished
+Intersection throughput: 50.5
+Vehicle delay: 43.163333333333334
+Messages delivered no: 17371
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=90, ip=trafficLights
+Simulation finished
+Intersection throughput: 53
+Vehicle delay: 49.64
+Messages delivered no: 18348
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=100, ip=trafficLights
+Simulation finished
+Intersection throughput: 59
+Vehicle delay: 49.9177108433735
+Messages delivered no: 18767
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=110, ip=trafficLights
+Simulation finished
+Intersection throughput: 57.5
+Vehicle delay: 57.88473684210526
+Messages delivered no: 20046
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=120, ip=trafficLights
+Simulation finished
+Intersection throughput: 60
+Vehicle delay: 63.97684210526316
+Messages delivered no: 19782
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=130, ip=trafficLights
+Simulation finished
+Intersection throughput: 63.5
+Vehicle delay: 61.615
+Messages delivered no: 20754
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=140, ip=trafficLights
+Simulation finished
+Intersection throughput: 52.5
+Vehicle delay: 71.3974074074074
+Messages delivered no: 18900
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=150, ip=trafficLights
+Simulation finished
+Intersection throughput: 57
+Vehicle delay: 77.36704918032787
+Messages delivered no: 19978
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=160, ip=trafficLights
+Simulation finished
+Intersection throughput: 57
+Vehicle delay: 75.8746153846154
+Messages delivered no: 20346
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=170, ip=trafficLights
+Simulation finished
+Intersection throughput: 54.5
+Vehicle delay: 88.37095238095239
+Messages delivered no: 19432
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=180, ip=trafficLights
+Simulation finished
+Intersection throughput: 56.5
+Vehicle delay: 90.64909090909092
+Messages delivered no: 19903
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=190, ip=trafficLights
+Simulation finished
+Intersection throughput: 58.5
+Vehicle delay: 86.62043478260868
+Messages delivered no: 20950
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=200, ip=trafficLights
+Simulation finished
+Intersection throughput: 58.5
+Vehicle delay: 92.96368421052632
+Messages delivered no: 20589
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=10, ip=fcfs
+Simulation finished
+Intersection throughput: 10
+Vehicle delay: 6.779473684210527
+Messages delivered no: 68
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=20, ip=fcfs
+Simulation finished
+Intersection throughput: 20
+Vehicle delay: 6.911052631578947
+Messages delivered no: 187
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=30, ip=fcfs
+Simulation finished
+Intersection throughput: 30
+Vehicle delay: 6.849649122807017
+Messages delivered no: 353
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=40, ip=fcfs
+Simulation finished
+Intersection throughput: 40.5
+Vehicle delay: 7.108421052631579
+Messages delivered no: 606
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=50, ip=fcfs
+Simulation finished
+Intersection throughput: 49.5
+Vehicle delay: 7.394255319148936
+Messages delivered no: 1139
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=60, ip=fcfs
+Simulation finished
+Intersection throughput: 59
+Vehicle delay: 7.454285714285715
+Messages delivered no: 1439
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=70, ip=fcfs
+Simulation finished
+Intersection throughput: 68.5
+Vehicle delay: 7.697692307692308
+Messages delivered no: 2071
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=80, ip=fcfs
+Simulation finished
+Intersection throughput: 79
+Vehicle delay: 8.493311258278146
+Messages delivered no: 3076
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=90, ip=fcfs
+Simulation finished
+Intersection throughput: 89
+Vehicle delay: 9.317380952380953
+Messages delivered no: 3271
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=100, ip=fcfs
+Simulation finished
+Intersection throughput: 99
+Vehicle delay: 8.867005347593583
+Messages delivered no: 4795
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=110, ip=fcfs
+Simulation finished
+Intersection throughput: 104.5
+Vehicle delay: 11.223502538071067
+Messages delivered no: 5778
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=120, ip=fcfs
+Simulation finished
+Intersection throughput: 109.5
+Vehicle delay: 14.295418719211822
+Messages delivered no: 5823
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=130, ip=fcfs
+Simulation finished
+Intersection throughput: 113.5
+Vehicle delay: 17.33615384615385
+Messages delivered no: 7306
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=140, ip=fcfs
+Simulation finished
+Intersection throughput: 120
+Vehicle delay: 21.54813953488372
+Messages delivered no: 7465
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=150, ip=fcfs
+Simulation finished
+Intersection throughput: 120
+Vehicle delay: 25.413809523809523
+Messages delivered no: 7116
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=160, ip=fcfs
+Simulation finished
+Intersection throughput: 126
+Vehicle delay: 27.633835616438354
+Messages delivered no: 7900
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=170, ip=fcfs
+Simulation finished
+Intersection throughput: 121
+Vehicle delay: 31.24961538461538
+Messages delivered no: 7566
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=180, ip=fcfs
+Simulation finished
+Intersection throughput: 124
+Vehicle delay: 36.10004784688995
+Messages delivered no: 7928
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=190, ip=fcfs
+Simulation finished
+Intersection throughput: 123.5
+Vehicle delay: 40.01030456852792
+Messages delivered no: 7369
+Messages lost no: 0
+Messages average delay: 0
+-----------
+vrp=200, ip=fcfs
+Simulation finished
+Intersection throughput: 121
+Vehicle delay: 44.66525773195877
+Messages delivered no: 8112
+Messages lost no: 0
+Messages average delay: 0
+-----------

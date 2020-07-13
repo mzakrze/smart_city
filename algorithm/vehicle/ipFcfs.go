@@ -21,15 +21,21 @@ type IntersectionPolicyFcfs struct {
 	nextReservationId types.ReservationId
 	graph             *util.Graph
 	tableIndex        types.Millisecond
+	wayId2ExitTimestamp map[types.NodeId]exitConflictZoneInfo
 }
 const gridSize types.Meter = 0.1
-const tableSize = 60 * 100 // na 60 sekund
+const tableSize = 20 * 100 // na 20 sekund
 
 type ipFcfsReservation struct {
 	reservationId types.ReservationId
 	startTs       types.Millisecond
 	endTs         types.Millisecond
 	reservedGrids [][]grid
+}
+
+type exitConflictZoneInfo struct {
+	velocity types.MetersPerSecond
+	ts types.Millisecond
 }
 
 var gridNoX = -1
@@ -43,7 +49,6 @@ type grid struct {
 }
 
 func CreateIntersectionPolicyFcfs(graph *util.Graph, configuration util.Configuration) *IntersectionPolicyFcfs {
-	// TODO - nieużywany argument
 	gridNoX = int((graph.ConflictZone.MaxX - graph.ConflictZone.MinX) / gridSize)
 	gridNoY = int((graph.ConflictZone.MaxY - graph.ConflictZone.MinY) / gridSize)
 	conflictZoneMinX = graph.ConflictZone.MinX
@@ -60,9 +65,15 @@ func CreateIntersectionPolicyFcfs(graph *util.Graph, configuration util.Configur
 		}
 	}
 
+	wayId2ExitTimestamp := make(map[types.NodeId]exitConflictZoneInfo)
+	for _, e := range graph.Exitpoints {
+		wayId2ExitTimestamp[e.Id] = exitConflictZoneInfo{velocity: math.Inf(1), ts: 0}
+	}
+
 	r := &IntersectionPolicyFcfs{
 		replies: []DsrcR2VMessage{},
 		reservationTable: reservationTable,
+		wayId2ExitTimestamp: wayId2ExitTimestamp,
 		reservations: make(map[types.ReservationId]ipFcfsReservation),
 		nextReservationId: 1,
 		graph: graph,
@@ -286,9 +297,10 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 
 	fitsInReservationTable := true
 	guard := 0
+	exitTs := types.Millisecond(0)
 	outer_for_label:
 	for ; exited() == false; ts += constants.SimulationStepInterval {
-		if guard > 5000 {
+		if guard > 50000 {
 			panic("Oops")
 		}
 		guard += 1
@@ -315,10 +327,25 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 		d := speed * float64(constants.SimulationStepInterval) / 1000.0
 		moveVehicle(d)
 
+		exitTs = ts
 	}
 
 	if fitsInReservationTable == false {
 		return false
+	}
+
+	exitVelocity, ok := reservationTsToSpeed[exitTs - constants.SimulationStepInterval]
+	if ok == false { panic("Key not found") }
+
+	if prevExit := ip.wayId2ExitTimestamp[msg.ExitPointId]; prevExit.ts > 0 && exitVelocity > prevExit.velocity {
+		deltaW := float64(exitTs - prevExit.ts) / 1000.0 * msg.VehiclePower
+		v2 := math.Sqrt((msg.VehicleMass * prevExit.velocity * prevExit.velocity + 2 * deltaW) / msg.VehicleMass)
+		s := (v2 + prevExit.velocity) / 2 * float64(exitTs - prevExit.ts) / 1000.0
+		t := s / exitVelocity
+		if t < 0.7 {
+			// samochód zderzy się z samochodem przed nim (zderzenie będzie za skrzyżowaniem)
+			return false
+		}
 	}
 
 	// vehicle fits in the reservation table - so let's actually reserve it
@@ -356,7 +383,7 @@ func (ip *IntersectionPolicyFcfs) makeReservationIfFitsInReservationTable(msg Ds
 	ip.nextReservationId += 1
 	ip.reservations[reservation.reservationId] = reservation
 	ip.replies = append(ip.replies, reply)
-
+	ip.wayId2ExitTimestamp[msg.ExitPointId] = exitConflictZoneInfo{velocity: exitVelocity, ts: exitTs}
 
 	return true
 }
@@ -403,7 +430,7 @@ func (ip *IntersectionPolicyFcfs) calcOccupied() int {
 }
 
 func (ip *IntersectionPolicyFcfs) relocateTableIfNecessary(ts types.Millisecond) {
-	const size = 1000
+	const size = 5000
 	if ts % size != 0 || ts == 0 {
 		return
 	}
@@ -468,7 +495,7 @@ func getOccupingGrids(x types.XCoord, y types.YCoord, alpha types.Angle) []grid 
 	leftRearX := x + r*math.Cos(math.Pi-leftRear)
 	leftRearY := y - r*math.Cos(math.Pi/2-leftRear)
 
-	const marginMeters = 0.0
+	const marginMeters = 0.1
 	margin := int(math.Floor(marginMeters / gridSize)) // [m] -> pixels
 	drawRectange := func(x1, y1, x2, y2, x3, y3, x4, y4 int) {
 

@@ -20,6 +20,7 @@ type Graph struct {
 	AllNodes        []Node
 	Entrypoints	 []*Node
 	Exitpoints	 []*Node
+	IsRoundabout bool
 }
 
 type ConflictZone struct {
@@ -55,6 +56,7 @@ type graphRaw struct {
 	MapWidth int `json:"mapWidth"`
 	MapHeight int `json:"mapHeight"`
 	ConflictZone conflictZoneRaw `json:"conflictZone"`
+	Type string `json:"type"`
 }
 
 type nodeRaw struct {
@@ -114,6 +116,7 @@ func ReadGraph(host string) (*Graph, error) {
 	}
 
 	graph := Graph{}
+	graph.IsRoundabout = graphObj.Type == "roundabout"
 	graph.ConflictZone = ConflictZone{
 		MinX: graphObj.ConflictZone.MinX,
 		MaxX: graphObj.ConflictZone.MaxX,

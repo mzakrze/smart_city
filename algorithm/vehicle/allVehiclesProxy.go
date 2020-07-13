@@ -1,18 +1,14 @@
 package vehicle
 
-import "algorithm/types"
+import (
+	"algorithm/types"
+)
 
 func AllVehiclesProxySingleton() *AllVehicleProxy {
-	enqueuedVehicles := map[types.WayId][]*VehicleActor {
-		1: []*VehicleActor{},
-		2: []*VehicleActor{},
-		3: []*VehicleActor{},
-		4: []*VehicleActor{},
-	}
 	if proxyInstance == nil {
 		proxyInstance = &AllVehicleProxy{
 			activeVehicles: []*VehicleActor{},
-			enqueuedVehicles: enqueuedVehicles,
+			enqueuedVehicles: map[types.WayId][]*VehicleActor {},
 			finishedVehicles: []*VehicleActor{},
 		}
 	}
@@ -40,31 +36,34 @@ func (p*AllVehicleProxy) GetAllActiveVehicles() []*VehicleActor {
 }
 
 func (p *AllVehicleProxy) Enqueue(v *VehicleActor) {
-	p.enqueuedVehicles[v.EntryPoint.WayId] = append(p.enqueuedVehicles[v.EntryPoint.WayId], v)
+	if _, e := p.enqueuedVehicles[v.EntryPoint.Id]; e == false {
+		p.enqueuedVehicles[v.EntryPoint.Id] = []*VehicleActor{}
+	}
+	p.enqueuedVehicles[v.EntryPoint.Id] = append(p.enqueuedVehicles[v.EntryPoint.Id], v)
 }
 
-func (p *AllVehicleProxy) NextQueued(wId types.WayId) *VehicleActor {
-	if len(p.enqueuedVehicles[wId]) == 0 {
+func (p *AllVehicleProxy) NextQueued(nId types.NodeId) *VehicleActor {
+	if len(p.enqueuedVehicles[nId]) == 0 {
 		return nil
 	}
-	return p.enqueuedVehicles[wId][0]
+	return p.enqueuedVehicles[nId][0]
 }
 
 func (p *AllVehicleProxy) RegisterVehicle(v *VehicleActor) {
-	for _, wId := range []types.WayId{1,2,3,4} {
-		if len(p.enqueuedVehicles[wId]) > 0 && p.enqueuedVehicles[wId][0].Id == v.Id {
-			p.enqueuedVehicles[wId] = p.enqueuedVehicles[wId][1:]
-			p.activeVehicles = append(p.activeVehicles, v)
-			return
-		}
-	}
 
-	panic("Oops")
+	if p.enqueuedVehicles[v.EntryPoint.Id][0].Id != v.Id {
+		panic("Oops")
+	}
+	p.enqueuedVehicles[v.EntryPoint.Id] = p.enqueuedVehicles[v.EntryPoint.Id][1:]
+	p.activeVehicles = append(p.activeVehicles, v)
 }
 
 func (p *AllVehicleProxy) GetAllVehiclesIntroduced() []*VehicleActor {
 	res := []*VehicleActor{}
 
+	for nId, _ := range p.enqueuedVehicles {
+		res = append(res, p.enqueuedVehicles[nId]...)
+	}
 	res = append(res, p.activeVehicles...)
 	res = append(res, p.finishedVehicles...)
 
@@ -74,7 +73,7 @@ func (p *AllVehicleProxy) GetAllVehiclesIntroduced() []*VehicleActor {
 var proxyInstance *AllVehicleProxy = nil
 type AllVehicleProxy struct {
 	activeVehicles []*VehicleActor
-	enqueuedVehicles map[types.WayId][]*VehicleActor
+	enqueuedVehicles map[types.NodeId][]*VehicleActor
 	finishedVehicles []*VehicleActor
 }
 

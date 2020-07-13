@@ -82,7 +82,7 @@ func main() {
 
 	fmt.Println("Simulation finished")
 	fmt.Println("Intersection throughput:",stats.IntersectionThroughput)
-	fmt.Println("Vehicle delay:",stats.VehicleAverageDelay)
+	fmt.Println("Vehicle average travel time:",stats.VehicleAvegTravelTime)
 	fmt.Println("Messages delivered no:",stats.MessagesDelivered)
 	fmt.Println("Messages lost no:",stats.MessagesLost)
 	fmt.Println("Messages average delay:",stats.MessagesAvgDelay)

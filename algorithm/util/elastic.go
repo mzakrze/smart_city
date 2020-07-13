@@ -1,53 +1,45 @@
 package util
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net/http"
-	"net/url"
 )
 
+
 func ClearOldIndicesInElastic(host string) {
-	client := &http.Client{}
-
-	urlLog := &url.URL{
-		Scheme:  "http",
-		Host: host + ":9200",
-		Path: "simulation-map",
-	}
-
-	urlMap := &url.URL{
-		Scheme:  "http",
-		Host: host + ":9200",
-		Path: "simulation-vehicle",
-	}
-
-	urlTrip := &url.URL{
-		Scheme:  "http",
-		Host: host + ":9200",
-		Path: "simulation-intersection",
-	}
-
-	_, err := client.Do(&http.Request{
-		Method: http.MethodDelete,
-		URL: urlLog,
+	deleteAll, _ := json.Marshal(map[string]interface{}{
+		"query": map[string]interface{}{
+			"match_all": map[string]interface{}{},
+		},
 	})
+
+	resp1, err := http.Post("http://" + host + ":9200/simulation-map/_delete_by_query?conflicts=proceed", "application/json", bytes.NewBuffer(deleteAll))
 	if err != nil {
 		panic(err)
 	}
+	defer resp1.Body.Close()
 
-	_, err = client.Do(&http.Request{
-		Method: http.MethodDelete,
-		URL: urlMap,
-	})
+	resp2, err := http.Post("http://" +  host + ":9200/simulation-vehicle/_delete_by_query","application/json", bytes.NewBuffer(deleteAll))
 	if err != nil {
 		panic(err)
 	}
+	defer resp2.Body.Close()
 
-	_, err = client.Do(&http.Request{
-		Method: http.MethodDelete,
-		URL: urlTrip,
-	})
-	if err != nil {
-		panic(err)
+	if resp1.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(resp1.Body)
+		fmt.Println("Request to ES failed:")
+		fmt.Println(string(body))
+		panic("ES error")
+	}
+
+	if resp2.StatusCode != 200 {
+		body, _ := ioutil.ReadAll(resp2.Body)
+		fmt.Println("Request to ES failed:")
+		fmt.Println(string(body))
+		panic("ES error")
 	}
 }
 

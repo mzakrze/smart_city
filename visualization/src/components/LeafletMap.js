@@ -4,6 +4,7 @@ import './LeafletCanvasLayer.js';
 import ElasticsearchFacade from './ElasticsearchFacade.js';
 import { Settings } from './../App.js';
 import TripIndexFacade from "./TripIndexFacade";
+import VehicleIndexFacade from "./VehicleIndexFacade";
 import LeafletRoadPlotLayer from "./LeafletRoadPlotLayer";
 import GraphProvider from "./GraphProvider";
 
@@ -16,6 +17,23 @@ class LeafletMap extends React.Component{
         this.state = {
             timestamp: 0,
         }
+
+        var that = this;
+        new Promise((resolve, reject) => {
+            let img = new Image();
+            img.src = "car-icon.png";
+            img.addEventListener('load', e => resolve(img));
+            img.addEventListener('error', () => {
+                reject(new Error(`Failed to load image's`));
+            });
+        })
+            .then(img => {
+                that.grass = img;
+                that.initialized = true
+            })
+            .catch(err => {
+                console.error(err)
+            })
 
         this.simulationResultCachedPing = null;
         this.simulationResultCachedPong = null;
@@ -38,6 +56,18 @@ class LeafletMap extends React.Component{
             .then((value => {
                 this.vehicleIdToSizeMap = value
             }))
+        new VehicleIndexFacade().getVehicleIdTurnsMap()
+            .then((value => {
+                let res = {}
+                for (let v of value.hits.hits) {
+                    res[v._source.vehicle_id] = {
+                        from: Number(v._source.way_from),
+                        to: Number(v._source.way_to),
+                    }
+                }
+
+                this.vehicleIdToTurnsMap = res;
+            }))
     }
 
     componentDidMount() {
@@ -54,39 +84,55 @@ class LeafletMap extends React.Component{
         var that = this;
 
         var SimulationVisualizationLayer = L.CanvasLayer.extend({
-            renderCircle: function(ctx, point, radius) {
-                ctx.fillStyle = 'rgba(255, 60, 60, 0.2)';
-                ctx.strokeStyle = 'rgba(255, 60, 60, 0.9)';
-                ctx.beginPath();
-                ctx.arc(point.x, point.y, radius, 0, Math.PI * 2.0, true, true);
-                ctx.closePath();
-                ctx.fill();
-                ctx.stroke();
-            },
-
             renderVehicle: function(ctx, location, size, metersToPixelsX, metersToPixelsY, alpha, vId, state) {
-                ctx.fillStyle = 'rgba(255, 0, 60, 1)';
                 let w = size.width * metersToPixelsX;
                 let l = size.length * metersToPixelsY;
                 w = Math.max(w, 6);
                 l = Math.max(l, 6);
                 let locationCorner = {x: location.x - l/2, y: location.y - w/2};
 
-                // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Transformations
-                const stateToColor = {
-                    1: 'rgba(255, 0, 0, 1)',
-                    2: 'rgba(0, 0, 255, 1)',
-                    3: 'rgba(0, 0, 255, 1)',
-                    4: 'rgba(255, 0, 0, 1)',
+                let from = -1;
+                if (that.vehicleIdToTurnsMap[vId]) {
+                    from = that.vehicleIdToTurnsMap[vId].from;
                 }
-                ctx.fillStyle = stateToColor[state]
+                if (alpha > Math.PI / 2.0 || alpha == 0.0 || alpha == -1.5707963267949) {
+                    alpha -= Math.PI
+                } else if (alpha < 0) {
+                    if (from == 3 || from == 4) {
+                        alpha -= Math.PI
+                    }
+                } else if (alpha > 0 && alpha < Math.PI / 2.0) {
+                    if (from == 1 || from == 4) {
+                        alpha -= Math.PI;
+                    }
+                } else {
+                    console.log("Illegal alpha:", alpha)
+                }
+
+                // https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API/Tutorial/Transformations
+                // ctx.fillStyle = 'rgba(255, 0, 60, 1)'; // default
+                // const stateToColor = {
+                //     1: 'rgba(255, 0, 0, 1)',
+                //     2: 'rgba(0, 0, 255, 1)',
+                //     3: 'rgba(0, 0, 255, 1)',
+                //     4: 'rgba(255, 0, 0, 1)',
+                // }
+                // ctx.fillStyle = stateToColor[state]
                 ctx.save();
                 ctx.translate(locationCorner.x + l/2, locationCorner.y + w/2);
 
                 ctx.rotate(alpha);
 
                 ctx.translate(-locationCorner.x - l/2, -locationCorner.y - w/2);
-                ctx.fillRect(locationCorner.x, locationCorner.y, l, w);
+if (from == -1) {
+    ctx.fillStyle = 'rgba(255, 0, 60, 1)'; // default
+    ctx.fillRect(locationCorner.x, locationCorner.y, l, w);
+
+} else {
+
+    ctx.drawImage(that.grass, locationCorner.x, locationCorner.y, l, w);
+}
+
                 ctx.restore();
             },
 

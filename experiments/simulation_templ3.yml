@@ -1,18 +1,19 @@
 simulation:
   vehicles_per_minute: PLACEHOLDER_vehicles_per_minute
-  intersection_policy: PLACEHOLDER_intersection_policy
+  intersection_policy: fcfs
   duration: 120
   warmup: 30
+  platoon: PLACEHOLDER_platooning
 map:
   type: junction_x
   lanes: 2
 vehicle:
-  weight: 1200
-  power: 120
-  braking_force: 3000.0
-  max_angular_speed: 0.8
+  weight: 1300
+  power: 80
+  braking_force: 4000.0
+  max_angular_speed: 0.7
   max_speed_on_conflict_zone: 15.0
 dsrc:
-  loss_p: 0.0
-  avg_latency: 0.0
+  loss_p: 5.0
+  avg_latency: 20.0
 random_seed: 42

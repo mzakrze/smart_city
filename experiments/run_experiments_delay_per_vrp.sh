@@ -1,11 +1,11 @@
 #!/bin/bash
 
-ip_range=(trafficLights)
+ip_range=(trafficLights fcfs)
 vrp_range=($(seq 10 10 200))
 
 echo "vrp;policy;delay;throughput" > result.csv
 echo "Date: "`date` > result_verbose.txt
-cat simulation_templ.yml >> result_verbose.txt
+cat simulation_templ_per_vrp.yml >> result_verbose.txt
 echo "" >> result_verbose.txt
 echo "-------" >> result_verbose.txt
 
@@ -14,7 +14,7 @@ for ip in ${ip_range[@]}; do
 
         echo "Running policy ${ip} on ${vrp} vehicles per minute ..."
 
-        cp simulation_templ.yml tmp.yml
+        cp simulation_templ_per_vrp.yml tmp.yml
         sed "s/PLACEHOLDER_vehicles_per_minute/${vrp}/" -i tmp.yml
         sed "s/PLACEHOLDER_intersection_policy/${ip}/" -i tmp.yml
 

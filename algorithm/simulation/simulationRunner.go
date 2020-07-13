@@ -6,7 +6,6 @@ import (
 	"algorithm/types"
 	"algorithm/util"
 	"algorithm/vehicle"
-	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -22,11 +21,12 @@ type SimulationRunner struct {
 	resultsLogger      logging.IResultsLogger
 	collisionDetector  *vehicle.CollisionDetector
 
-	nextVehicleId       types.VehicleId
-	vehicleIdToAppearTs map[types.VehicleId]types.Millisecond
-	vehicleIdToLeaveTs  map[types.VehicleId]types.Millisecond
-	CurrentTs           types.Millisecond
+	nextVehicleId            types.VehicleId
+	vehicleIdToAppearTs      map[types.VehicleId]types.Millisecond
+	vehicleIdToLeaveTs       map[types.VehicleId]types.Millisecond
+	CurrentTs                types.Millisecond
 	vehiclesSpawnedInAMinute int
+	lastVehicleSpawnedSecond int
 }
 
 
@@ -63,7 +63,7 @@ func SimulationRunnerSingleton(
 
 type ShortStats struct {
 	IntersectionThroughput float64 // vehicles per minute
-	VehicleAverageDelay    float64 // seconds
+	VehicleAvegTravelTime  float64 // seconds
 	MessagesDelivered      int
 	MessagesLost           int
 	MessagesAvgDelay       types.Millisecond
@@ -93,7 +93,7 @@ func (r *SimulationRunner) RunSimulation() ShortStats {
 		// Premise: vehicle must appear only on full second
 		if simulationDurationElapsed() == false && isFullSecond() {
 			r.spawnNewVehicles(ts)
-			r.activeNewVehicles(ts) // TODO - to przeniesc żeby sie wykonywalo zawsze (trzeba zmienić w logowaniu wyników)
+			r.activateNewVehicles(ts)
 		}
 
 		for _, v := range r.allVehiclesProxy.GetAllActiveVehicles() {
@@ -107,11 +107,9 @@ func (r *SimulationRunner) RunSimulation() ShortStats {
 		if isFullSecondMinusStep() {
 			prunedVehicles := r.cleanUpVehicles(ts)
 			for _, v := range prunedVehicles {
-				r.resultsLogger.VehicleFinished(v.Id, ts)
+				r.resultsLogger.VehicleFinished(v.Id, ts, v.EntryPoint.WayId, v.ExitPoint.WayId)
 			}
 		}
-
-
 
 		ts += constants.SimulationStepInterval
 
@@ -123,9 +121,9 @@ func (r *SimulationRunner) RunSimulation() ShortStats {
 	return r.getStatitistics()
 }
 
-func (r *SimulationRunner) activeNewVehicles(ts  types.Millisecond) {
-	for _, wId := range []types.WayId{1,2,3,4} {
-		next := r.allVehiclesProxy.NextQueued(wId)
+func (r *SimulationRunner) activateNewVehicles(ts  types.Millisecond) {
+	for _, e  := range r.graph.Entrypoints {
+		next := r.allVehiclesProxy.NextQueued(e.Id)
 		for next != nil && r.spaceAvailable(next) {
 			distance := 100.0
 			for _, v := range r.allVehiclesProxy.GetAllActiveVehicles() {
@@ -136,19 +134,26 @@ func (r *SimulationRunner) activeNewVehicles(ts  types.Millisecond) {
 					distance = math.Min(distance, d)
 				}
 			}
-			initSpeed := math.Min(10.0, math.Sqrt(2 * distance * r.configuration.VehicleBrakingForce / r.configuration.VehicleWeight) * 0.5) * 0.8
+			initSpeed := 4.0
 			next.Speed = initSpeed
 			r.allVehiclesProxy.RegisterVehicle(next)
-			next = r.allVehiclesProxy.NextQueued(wId)
+			next = r.allVehiclesProxy.NextQueued(e.Id)
 		}
 	}
 }
 
+
+
 func (r *SimulationRunner) spawnNewVehicles(ts types.Millisecond) {
-	toSpawn, remainder := int(r.configuration.VehiclesPerMinute / 60), r.configuration.VehiclesPerMinute % 60
-	if r.vehiclesSpawnedInAMinute < int(ts % 60000) * remainder {
+	toSpawn := int(r.configuration.VehiclesPerMinute / 60)
+	secondInMinute := float64(ts % 60000) / 1000.0
+	if (float64(r.configuration.VehiclesPerMinute % 60) / 60.0) * secondInMinute > float64(r.vehiclesSpawnedInAMinute) {
 		toSpawn += 1
 		r.vehiclesSpawnedInAMinute += 1
+	}
+
+	if ts % 60000 == 0 {
+		r.vehiclesSpawnedInAMinute = 0
 	}
 
 	for i := 0; i < toSpawn; i++ {
@@ -170,7 +175,7 @@ func (r *SimulationRunner) createRandomVehicle(ts types.Millisecond) *vehicle.Ve
 		switch lane {
 		case 0:
 			return []types.WayId{left, straight}
-		case r.configuration.MapLanes - 1:
+		case len(r.graph.Entrypoints):
 			return []types.WayId{right, straight}
 		default:
 			return []types.WayId{straight}
@@ -190,9 +195,6 @@ func (r *SimulationRunner) createRandomVehicle(ts types.Millisecond) *vehicle.Ve
 
 			}
 		}
-		if len(possibleExitpoints) == 0 {
-			fmt.Println("not ok")
-		}
 		return possibleExitpoints[rand.Intn(len(possibleExitpoints))]
 	}
 
@@ -202,7 +204,7 @@ func (r *SimulationRunner) createRandomVehicle(ts types.Millisecond) *vehicle.Ve
 	vId := r.nextVehicleId
 	r.nextVehicleId += 1
 
-	return vehicle.NewVehicleActor(vId, ts, entrypoint, exitpoint, r.graph, r.sensorLayer, r.communicationLayer)
+	return vehicle.NewVehicleActor(vId, ts, entrypoint, exitpoint, r.graph, r.sensorLayer, r.communicationLayer, r.configuration)
 }
 
 
@@ -218,7 +220,7 @@ func (r *SimulationRunner) spaceAvailable(v *vehicle.VehicleActor) bool {
 		}
 	}
 
-	return minDist > 10
+	return minDist > 20.0
 }
 
 func (r *SimulationRunner) cleanUpVehicles(ts types.Millisecond) []*vehicle.VehicleActor {
@@ -264,14 +266,14 @@ func (r *SimulationRunner) getStatitistics() ShortStats {
 		}
 	}
 
-	avgDelay := float64(sumDelay) / float64(vehiclesCounter) / 1000
+	avgTravelTime := float64(sumDelay) / float64(vehiclesCounter) / 1000
 	if vehiclesCounter == 0 {
-		avgDelay = 0
+		avgTravelTime = 0
 	}
 	msgDelivered, msgLost, msgDelay := r.communicationLayer.GetStats()
 	return ShortStats{
 		IntersectionThroughput: intersectionThroughPut,
-		VehicleAverageDelay:    avgDelay,
+		VehicleAvegTravelTime:  avgTravelTime,
 		MessagesLost:           msgLost,
 		MessagesDelivered:      msgDelivered,
 		MessagesAvgDelay:       msgDelay,

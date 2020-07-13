@@ -2,6 +2,7 @@ package logging
 
 import (
 	"algorithm/types"
+	"algorithm/util"
 	"fmt"
 	"github.com/fluent/fluent-logger-golang/fluent"
 	"testing"
@@ -104,7 +105,7 @@ func TestFluentLoggerUnit(t *testing.T) {
 		fluentLogger.VehicleStepReport(vehicleId, ts, x, y, alpha, speed, acc)
 		x += speed * 10.0 / 1000.0
 	}
-	fluentLogger.VehicleFinished(vehicleId, durationMs - 10)
+	fluentLogger.VehicleFinished(vehicleId, durationMs - 10, 1, 2)
 	fluentLogger.SimulationFinished(startTime.Add(time.Second * 2))
 
 	// then

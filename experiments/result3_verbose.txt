@@ -1,0 +1,181 @@
+Date: wto, 9 cze 2020, 20:45:26 CEST
+simulation:
+  vehicles_per_minute: PLACEHOLDER_vehicles_per_minute
+  intersection_policy: fcfs
+  duration: 120
+  warmup: 30
+  platoon: PLACEHOLDER_platooning
+map:
+  type: junction_x
+  lanes: 2
+vehicle:
+  weight: 1300
+  power: 80
+  braking_force: 4000.0
+  max_angular_speed: 0.7
+  max_speed_on_conflict_zone: 15.0
+dsrc:
+  loss_p: 5.0
+  avg_latency: 20.0
+random_seed: 42
+-------
+vpm=10, ip=
+Simulation finished
+Intersection throughput: 10
+Vehicle delay: 7.884736842105263
+Messages delivered no: 58
+Messages lost no: 2
+Messages average delay: 19
+-----------
+vpm=20, ip=
+Simulation finished
+Intersection throughput: 19.5
+Vehicle delay: 7.832105263157895
+Messages delivered no: 145
+Messages lost no: 11
+Messages average delay: 18
+-----------
+vpm=30, ip=
+Simulation finished
+Intersection throughput: 30
+Vehicle delay: 7.847142857142857
+Messages delivered no: 241
+Messages lost no: 14
+Messages average delay: 19
+-----------
+vpm=40, ip=
+Simulation finished
+Intersection throughput: 39.5
+Vehicle delay: 7.963333333333333
+Messages delivered no: 387
+Messages lost no: 22
+Messages average delay: 18
+-----------
+vpm=50, ip=
+Simulation finished
+Intersection throughput: 50
+Vehicle delay: 8.613655913978494
+Messages delivered no: 649
+Messages lost no: 37
+Messages average delay: 18
+-----------
+vpm=60, ip=
+Simulation finished
+Intersection throughput: 59.5
+Vehicle delay: 8.662566371681416
+Messages delivered no: 1215
+Messages lost no: 57
+Messages average delay: 19
+-----------
+vpm=70, ip=
+Simulation finished
+Intersection throughput: 70
+Vehicle delay: 9.012900763358779
+Messages delivered no: 1405
+Messages lost no: 64
+Messages average delay: 19
+-----------
+vpm=80, ip=
+Simulation finished
+Intersection throughput: 80.5
+Vehicle delay: 9.567181208053691
+Messages delivered no: 2073
+Messages lost no: 106
+Messages average delay: 19
+-----------
+vpm=90, ip=
+Simulation finished
+Intersection throughput: 87.5
+Vehicle delay: 11.544878048780488
+Messages delivered no: 2032
+Messages lost no: 95
+Messages average delay: 19
+-----------
+vpm=100, ip=
+Simulation finished
+Intersection throughput: 97
+Vehicle delay: 13.922203389830509
+Messages delivered no: 2613
+Messages lost no: 130
+Messages average delay: 19
+-----------
+vpm=110, ip=
+Simulation finished
+Intersection throughput: 102.5
+Vehicle delay: 16.22936170212766
+Messages delivered no: 3088
+Messages lost no: 165
+Messages average delay: 19
+-----------
+vpm=120, ip=
+Simulation finished
+Intersection throughput: 95
+Vehicle delay: 16.387660818713453
+Messages delivered no: 2526
+Messages lost no: 129
+Messages average delay: 19
+-----------
+vpm=130, ip=
+Simulation finished
+Intersection throughput: 107
+Vehicle delay: 24.99
+Messages delivered no: 4259
+Messages lost no: 227
+Messages average delay: 19
+-----------
+vpm=140, ip=
+Simulation finished
+Intersection throughput: 111
+Vehicle delay: 27.91746113989637
+Messages delivered no: 3308
+Messages lost no: 161
+Messages average delay: 19
+-----------
+vpm=150, ip=
+Simulation finished
+Intersection throughput: 84
+Vehicle delay: 38.36313432835821
+Messages delivered no: 2592
+Messages lost no: 133
+Messages average delay: 19
+-----------
+vpm=160, ip=
+Simulation finished
+Intersection throughput: 87.5
+Vehicle delay: 31.982857142857142
+Messages delivered no: 2755
+Messages lost no: 142
+Messages average delay: 19
+-----------
+vpm=170, ip=
+Simulation finished
+Intersection throughput: 113
+Vehicle delay: 38.625359116022096
+Messages delivered no: 3255
+Messages lost no: 168
+Messages average delay: 19
+-----------
+vpm=180, ip=
+Simulation finished
+Intersection throughput: 105.5
+Vehicle delay: 42.94209580838323
+Messages delivered no: 3531
+Messages lost no: 169
+Messages average delay: 19
+-----------
+vpm=190, ip=
+Simulation finished
+Intersection throughput: 107.5
+Vehicle delay: 44.27070175438596
+Messages delivered no: 3293
+Messages lost no: 167
+Messages average delay: 19
+-----------
+vpm=200, ip=
+Simulation finished
+Intersection throughput: 103
+Vehicle delay: 52.263333333333335
+Messages delivered no: 3185
+Messages lost no: 168
+Messages average delay: 19
+-----------

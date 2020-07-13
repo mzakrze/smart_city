@@ -304,6 +304,7 @@ class JunctionXGenerator:
             "mapWidth": self.map_width,
             "mapHeight": self.map_height,
             "conflictZone": conflict_zone,
+            "type": "junction_x",
         }
 
     def fix_nodes_ids(self, nodes, edges):

@@ -14,3 +14,13 @@ ggplot(df, aes(x=vrp, y=delay, shape=policy, color=policy)) +
     xlim(0, NA)
 
 # export result image
+
+
+
+ggplot(df, aes(x=vrp, y=delay, shape=platooning, color=platooning)) +
+    geom_point() + scale_shape_manual(values=c(0, 2)) +
+    xlab("Liczba pojazdów na minutę") +
+    ylab("Średni czas przejazdu [s]") +
+    ylim(0, NA) +
+    xlim(0, NA)
+

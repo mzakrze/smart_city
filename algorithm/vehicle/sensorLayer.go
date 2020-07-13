@@ -76,41 +76,13 @@ func (sensor *SensorLayer) ScanVehiclesAhead (vehicle *VehicleActor) (float64, t
 				return 0.0, collidedWith.Id // FIXME - lekki hack - w powyższym jest drobny błąd - źle wyliczana jest odległość w zależności od kąta pojazdu, z którym sie zderza
 				//panic("Oops")
 			}
+			if collidedWith.Id > vehicle.Id {
+				return 10, -1
+			}
 			return res, collidedWith.Id
 		}
 	}
 	return MaxDistanceMeasurement, -1
-}
-
-
-func (sensor *SensorLayer) ScanVehiclesAhead_old (vehicle *VehicleActor) float64 {
-	var getDist func (actor *VehicleActor) float64 = nil
-
-	x := vehicle.X - vehicle.EdgeAt.To.X
-	y := vehicle.Y - vehicle.EdgeAt.To.Y
-
-	d := math.Sqrt(x * x + y * y)
-
-	getDist = func (actor *VehicleActor) float64 {
-		if vehicle.EdgeAt.Id != actor.EdgeAt.Id {
-			return MaxDistanceMeasurement
-		}
-		x1 := actor.X - actor.EdgeAt.To.X
-		y1 := actor.Y - actor.EdgeAt.To.Y
-		d1 := math.Sqrt(x1 * x1 + y1 * y1)
-		if d < d1 {
-			return MaxDistanceMeasurement
-		}
-		return d - d1 - constants.VehicleLength
-	}
-
-	closest := MaxDistanceMeasurement
-	for _, v := range sensor.proxy.GetAllActiveVehicles() {
-		if v.Id != vehicle.Id {
-			closest = math.Min(getDist(v), closest)
-		}
-	}
-	return closest
 }
 
 

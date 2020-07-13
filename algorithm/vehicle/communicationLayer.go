@@ -23,6 +23,8 @@ type DsrcV2RMessage struct {
 	VehicleX                  types.XCoord
 	VehicleY                  types.YCoord
 	VehicleSpeed              types.MetersPerSecond
+	VehiclePower 			  float64
+	VehicleMass				  float64
 	ApproachConflictZoneMinTs types.Millisecond
 	ApproachConflictZoneSpeed types.MetersPerSecond
 	ConflictZoneNodeEnter     *util.Node
@@ -73,6 +75,7 @@ func CommunicationLayerSingleton(proxy *AllVehicleProxy, configuration util.Conf
 			proxy:                   proxy,
 			messages:                []message{},
 			deliveryLossProbability: configuration.DsrcMsgLossProbability,
+			broadcastingReservationOn: configuration.PlatooningOn,
 			deliveryAvgDelay:        types.Millisecond(configuration.DsrcMsgAvgDelay),
 			statsLost:               0,
 			statsDelivered:          0,
@@ -83,7 +86,11 @@ func CommunicationLayerSingleton(proxy *AllVehicleProxy, configuration util.Conf
 }
 
 func (c *CommunicationLayer) SendDsrcV2V(msg DsrcV2VMessage) {
-	for _, v := range c.proxy.GetAllActiveVehicles() {
+	if c.broadcastingReservationOn == false {
+		return
+	}
+
+	for _, v := range c.proxy.GetAllVehiclesIntroduced() {
 		if v.Id == msg.sender {
 			continue
 		}
@@ -147,7 +154,6 @@ func (c *CommunicationLayer) VehicleReceive(ts types.Millisecond, id types.Vehic
 
 func (c *CommunicationLayer) VehicleReceiveV2V(ts types.Millisecond, id types.VehicleId) []DsrcV2VMessage {
 	res := []DsrcV2VMessage{}
-	//fmt.Println("Before: len(c.messages):", len(c.messages))
 	tmp := c.messages[:0]
 	for i := range c.messages {
 		if c.messages[i].deliveryTs <= ts && c.messages[i].msgLayer == "v2v" && c.messages[i].vehicleReceiverId == id {
@@ -157,7 +163,6 @@ func (c *CommunicationLayer) VehicleReceiveV2V(ts types.Millisecond, id types.Ve
 		}
 	}
 	c.messages = tmp
-	//fmt.Println("After: len(c.messages):", len(c.messages))
 	return res
 }
 
@@ -172,19 +177,37 @@ func (c *CommunicationLayer) IntersectionManagerReceive(ts types.Millisecond) []
 		}
 	}
 	c.messages = tmp
+
+	if ts % 1000 == 0 {
+		c.cleanupMessages(ts)
+	}
+
 	return res
+}
+
+func (c *CommunicationLayer) cleanupMessages(ts types.Millisecond) {
+	tmp := c.messages[:0]
+	for i := range c.messages {
+		if c.messages[i].deliveryTs < ts - 500 {
+
+		} else {
+			tmp = append(tmp, c.messages[i])
+		}
+	}
+	c.messages = tmp
 }
 
 
 var instanceCommunication *CommunicationLayer = nil
 type CommunicationLayer struct {
-	proxy                   *AllVehicleProxy
-	messages                []message
-	deliveryLossProbability float64
-	deliveryAvgDelay        types.Millisecond
-	statsLost               int
-	statsDelivered          int
-	statsSumDelay           types.Millisecond
+	proxy                     *AllVehicleProxy
+	messages                  []message
+	deliveryLossProbability   float64
+	deliveryAvgDelay          types.Millisecond
+	statsLost                 int
+	statsDelivered            int
+	statsSumDelay             types.Millisecond
+	broadcastingReservationOn bool
 }
 
 

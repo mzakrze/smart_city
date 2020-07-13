@@ -46,7 +46,7 @@ func (im *IntersectionManager) Ping(ts types.Millisecond) {
 
 	for _, m := range messages {
 
-		im.policy .ProcessMsg(m)
+		im.policy.ProcessMsg(m)
 
 	}
 

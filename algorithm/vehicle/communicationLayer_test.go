@@ -40,7 +40,8 @@ func TestVehicleRoadCommunictionSomeDelay(t *testing.T) {
 	conf := util.Configuration{
 		DsrcMsgLossProbability: 0.0,
 		DsrcMsgAvgDelay: delay,
-}
+	}
+	instanceCommunication = nil
 	c := CommunicationLayerSingleton(p, conf)
 
 	for i := types.Millisecond(10); i < tests; i += constants.SimulationStepInterval {
@@ -69,6 +70,7 @@ func TestVehicleRoadCommunictionSomeLoss(t *testing.T) {
 		DsrcMsgLossProbability: lossP,
 		DsrcMsgAvgDelay: 0,
 	}
+	instanceCommunication = nil
 	c := CommunicationLayerSingleton(p, conf)
 
 	for i := 0; i < sent; i++ {
